@@ -181,12 +181,39 @@ Report Automator"""
             # ============================================
             st.header("📈 Report 2: Current Month COE Sales")
             
-            # Filter for current month using column O (Date COE received)
-            current_month_start = datetime(today.year, today.month, 1)
-            mask_current_month = (df[date_coe_col] >= current_month_start) & (df[date_coe_col] <= today)
-            df_current_month = df[mask_current_month].copy()
+            # Month selector
+            st.subheader("Select Month")
+            col1, col2 = st.columns(2)
             
-            st.info(f"Showing data from {current_month_start.strftime('%b %d, %Y')} to {today.strftime('%b %d, %Y')}")
+            # Get unique months from data
+            df['year_month'] = df[date_coe_col].dt.to_period('M')
+            available_months = sorted(df['year_month'].dropna().unique(), reverse=True)
+            
+            if available_months:
+                # Convert to datetime for display
+                month_options = [pd.Period(m).to_timestamp() for m in available_months]
+                month_labels = [m.strftime('%B %Y') for m in month_options]
+                
+                with col1:
+                    selected_month_label = st.selectbox(
+                        "Choose Month",
+                        options=month_labels,
+                        index=0,  # Default to latest month
+                        key="month_selector"
+                    )
+                
+                # Get the selected month's start and end dates
+                selected_month_idx = month_labels.index(selected_month_label)
+                selected_month_date = month_options[selected_month_idx]
+                selected_month_start = pd.Timestamp(selected_month_date.year, selected_month_date.month, 1)
+                selected_month_end = (selected_month_start + pd.DateOffset(months=1)) - pd.DateOffset(days=1)
+                
+                with col2:
+                    st.info(f"**Period:** {selected_month_start.strftime('%b %d')} - {selected_month_end.strftime('%b %d, %Y')}")
+                
+                # Filter for selected month using column O (Date COE received)
+                mask_selected_month = (df[date_coe_col] >= selected_month_start) & (df[date_coe_col] <= selected_month_end)
+                df_current_month = df[mask_selected_month].copy()
             
             if not df_current_month.empty:
                 # Column references
@@ -246,7 +273,7 @@ Report Automator"""
                 st.download_button(
                     label="📥 Download Current Month Sales Report",
                     data=buffer2,
-                    file_name=f"COE_Sales_{today.strftime('%B_%Y')}.xlsx",
+                    file_name=f"COE_Sales_{selected_month_date.strftime('%B_%Y')}.xlsx",
                     mime="application/vnd.ms-excel"
                 )
                 
@@ -256,7 +283,7 @@ Report Automator"""
                 default_recipients_sales = config.get("coe_sales_recipients", "")
                 recipients_sales = st.text_input("Recipients (comma separated)", value=default_recipients_sales, key="coe_sales_recipients", help="Email recipients for Current Month Sales Report")
                 
-                email_subject_sales = st.text_input("Subject", f"COE Sales Report - {today.strftime('%B %Y')}", key="subject_sales")
+                email_subject_sales = st.text_input("Subject", f"COE Sales Report - {selected_month_date.strftime('%B %Y')}", key="subject_sales")
                 
                 # Convert table to HTML
                 table_html = display_table.to_html(index=False, border=1, classes='dataframe')
@@ -281,8 +308,8 @@ tr:nth-child(even) {{background-color: #f9f9f9;}}
 </head>
 <body>
 <p>Hi Team,</p>
-<p>Please find attached the COE Sales Report for <strong>{today.strftime('%B %Y')}</strong>.</p>
-<p>This report covers COE sales from <strong>{current_month_start.strftime('%B %d')}</strong> to <strong>{today.strftime('%B %d, %Y')}</strong>.</p>
+<p>Please find attached the COE Sales Report for <strong>{selected_month_date.strftime('%B %Y')}</strong>.</p>
+<p>This report covers COE sales from <strong>{selected_month_start.strftime('%B %d')}</strong> to <strong>{selected_month_end.strftime('%B %d, %Y')}</strong>.</p>
 
 <h2>📊 Sales Summary</h2>
 {styled_table_html}
@@ -325,7 +352,7 @@ tr:nth-child(even) {{background-color: #f9f9f9;}}
                             part = MIMEBase('application', 'octet-stream')
                             part.set_payload(buffer2.getvalue())
                             encoders.encode_base64(part)
-                            part.add_header('Content-Disposition', f"attachment; filename=COE_Sales_{today.strftime('%B_%Y')}.xlsx")
+                            part.add_header('Content-Disposition', f"attachment; filename=COE_Sales_{selected_month_date.strftime('%B_%Y')}.xlsx")
                             msg.attach(part)
 
                             server = smtplib.SMTP('smtp.gmail.com', 587)
