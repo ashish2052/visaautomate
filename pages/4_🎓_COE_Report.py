@@ -15,8 +15,23 @@ uploaded_file = st.file_uploader("Upload Excel file", type=['xlsx', 'xls'])
 
 if uploaded_file is not None:
     try:
-        # Load the file
-        df = pd.read_excel(uploaded_file, engine='openpyxl')
+        # Load the file - try reading, check if row 1 has headers or row 2
+        df_test = pd.read_excel(uploaded_file, engine='openpyxl', nrows=2)
+        
+        # Check if first row looks like it has valid headers
+        # If the first row has mostly NaN or generic names, try row 2
+        if df_test.columns[0] == 'Unnamed: 0' or pd.isna(df_test.columns[0]):
+            # Headers are likely in row 2 (index 1)
+            uploaded_file.seek(0)  # Reset file pointer
+            df = pd.read_excel(uploaded_file, engine='openpyxl', header=1)
+        else:
+            # Headers are in row 1
+            uploaded_file.seek(0)  # Reset file pointer
+            df = pd.read_excel(uploaded_file, engine='openpyxl', header=0)
+        
+        # Remove any completely empty columns
+        df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+        
         st.success(f"✅ File uploaded successfully! Loaded {len(df)} records.")
         
         # Display column names for debugging
