@@ -6,241 +6,185 @@ import json
 import os
 
 # 1. PAGE SETUP
-st.set_page_config(page_title="COE Report Automator", page_icon="🎓")
+st.set_page_config(page_title="COE Report Automator", page_icon="🎓", layout="wide")
 st.title("🎓 COE Report Automator")
-st.write("Upload your COE report to track student visa/COE expiries.")
+st.write("Upload your COE data file to generate automated reports.")
 
-# 2. FILE UPLOADER & URL INPUT
-st.subheader("📂 Data Source")
-data_source = st.radio("Choose data source:", ["Upload File", "Dropbox URL"], horizontal=True)
+# 2. FILE UPLOADER
+uploaded_file = st.file_uploader("Upload Excel file", type=['xlsx', 'xls'])
 
-df = None
-
-if data_source == "Upload File":
-    uploaded_file = st.file_uploader("Upload CSV or Excel file", type=['csv', 'xlsx'])
-    if uploaded_file:
-        if uploaded_file.name.endswith('.csv'):
-            df = pd.read_csv(uploaded_file)
-        else:
-            df = pd.read_excel(uploaded_file)
-
-else:
-    dropbox_url = st.text_input("Paste Dropbox Link", placeholder="https://www.dropbox.com/...")
-    if dropbox_url:
-        try:
-            # Convert to direct download link
-            if "dl=0" in dropbox_url:
-                direct_url = dropbox_url.replace("dl=0", "dl=1")
-            elif "dl=1" not in dropbox_url:
-                if "?" in dropbox_url:
-                    direct_url = dropbox_url + "&dl=1"
-                else:
-                    direct_url = dropbox_url + "?dl=1"
-            else:
-                direct_url = dropbox_url
-            
-            with st.spinner("Downloading data from Dropbox..."):
-                import requests
-                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-                response = requests.get(direct_url, headers=headers, allow_redirects=True)
-                response.raise_for_status()
-                
-                # Debug: Check if we got an HTML file instead of binary
-                content_type = response.headers.get('Content-Type', '')
-                if 'text/html' in content_type:
-                    st.error("⚠️ Dropbox returned a webpage (Login Page) instead of the file.")
-                    st.warning("""
-                    **Possible Causes:**
-                    1. The link is not public (requires login).
-                    2. The link expired.
-                    
-                    **Solution:**
-                    - Open Dropbox, click **Share**, and ensure "Anyone with the link" is selected.
-                    - OR: Download the file manually and use the **'Upload File'** option above.
-                    """)
-                    st.stop()
-                
-                # Load into pandas
-                file_content = io.BytesIO(response.content)
-                
-                # Try Excel first with explicit engine
-                try:
-                    df = pd.read_excel(file_content, engine='openpyxl')
-                except Exception as e_excel:
-                    # If Excel fails, try CSV but keep the Excel error for reporting
-                    file_content.seek(0)
-                    try:
-                        df = pd.read_csv(file_content)
-                    except Exception as e_csv:
-                        st.error(f"❌ Failed to process file.")
-                        with st.expander("See Error Details"):
-                            st.write(f"**Excel Error:** {e_excel}")
-                            st.write(f"**CSV Error:** {e_csv}")
-                        st.stop()
-                    
-            st.success("✅ Data loaded successfully from Dropbox!")
-            
-        except Exception as e:
-            st.error(f"Error fetching from Dropbox: {e}")
-
-if df is not None:
+if uploaded_file is not None:
     try:
+        # Load the file
+        df = pd.read_excel(uploaded_file, engine='openpyxl')
+        st.success(f"✅ File uploaded successfully! Loaded {len(df)} records.")
+        
+        # Display column names for debugging
+        with st.expander("📋 View Column Names"):
+            st.write(f"Total columns: {len(df.columns)}")
+            st.write(df.columns.tolist())
+        
         # 3. PROCESSING LOGIC
-        # Convert Dates
-        # Smart Column Detection
-        date_col = None
-        
-        # 1. Try exact match from known patterns
-        candidates = ['COE End Date', 'Visa Expiry Date', 'End Date', 'Expiry Date', 'COE End']
-        for c in candidates:
-            if c in df.columns:
-                date_col = c
-                break
-        
-        # 2. Fuzzy search if not found
-        if not date_col:
-            for col in df.columns:
-                col_lower = str(col).lower()
-                if ('date' in col_lower or 'expiry' in col_lower) and ('end' in col_lower or 'coe' in col_lower):
-                    date_col = col
-                    break
-        
-        if date_col:
-            df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+        # Column mapping (0-indexed: A=0, O=14, S=18, L=11, AU=46, AO=40)
+        try:
+            # Convert column O (Date COE received) to datetime
+            date_coe_col = df.columns[14]  # Column O (0-indexed)
+            df[date_coe_col] = pd.to_datetime(df[date_coe_col], errors='coerce')
             
-            # Define Timeframe (e.g., expiring in next 6 months)
-            today = datetime.now()
-            six_months_out = today + timedelta(days=180)
-            
-            # Filter: Expiring soon (future dates only)
-            mask_time = (df[date_col] >= today) & (df[date_col] <= six_months_out)
-            df_expiring = df[mask_time].copy()
-            
-            # Show stats
-            col1, col2 = st.columns(2)
-            col1.metric("Total Students", len(df))
-            col2.metric("Expiring < 6 Months", len(df_expiring))
+            # Convert column S (Course End date / COE end date) to datetime
+            coe_end_col = df.columns[18]  # Column S
+            df[coe_end_col] = pd.to_datetime(df[coe_end_col], errors='coerce')
             
             st.divider()
             
-            st.subheader("⚠️ Students with Expiring COEs")
-            if not df_expiring.empty:
-                st.dataframe(df_expiring)
-            else:
-                st.info("No COEs expiring in the next 6 months.")
-                
-            # 4. SAVE TO EXCEL (IN MEMORY)
-            buffer = io.BytesIO()
-            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                df.to_excel(writer, sheet_name='All Students', index=False)
-                if not df_expiring.empty:
-                    df_expiring.to_excel(writer, sheet_name='Expiring Soon', index=False)
-                
-            # 5. DOWNLOAD BUTTON
+            # ============================================
+            # REPORT 1: COE EXPIRY ANALYSIS
+            # ============================================
+            st.header("📊 Report 1: COE Expiry Analysis")
+            
+            # Calculate date thresholds
+            today = datetime.now()
+            eighteen_months_ago = today - timedelta(days=18*30)  # Approx 18 months
+            six_months_future = today + timedelta(days=6*30)  # Approx 6 months
+            
+            # Sheet 1: COE received in past 18 months
+            mask_18_months = (df[date_coe_col] >= eighteen_months_ago) & (df[date_coe_col] <= today)
+            df_18_months = df[mask_18_months].copy()
+            
+            # Sheet 2: COE expiry < 6 months
+            mask_expiring = (df[coe_end_col] >= today) & (df[coe_end_col] <= six_months_future)
+            df_expiring = df[mask_expiring].copy()
+            
+            # Select columns A to W (0-indexed: 0 to 22)
+            cols_a_to_w = df.columns[0:23].tolist()
+            df_18_months_filtered = df_18_months[cols_a_to_w]
+            df_expiring_filtered = df_expiring[cols_a_to_w]
+            
+            # Display metrics
+            col1, col2 = st.columns(2)
+            col1.metric("COE Received (Past 18 Months)", len(df_18_months_filtered))
+            col2.metric("COE Expiring (< 6 Months)", len(df_expiring_filtered))
+            
+            # Display data
+            tab1, tab2 = st.tabs(["COE Received (18M)", "COE Expiring (6M)"])
+            
+            with tab1:
+                st.subheader("COE Received in Past 18 Months")
+                if not df_18_months_filtered.empty:
+                    st.dataframe(df_18_months_filtered, use_container_width=True)
+                else:
+                    st.info("No records found.")
+            
+            with tab2:
+                st.subheader("COE Expiring < 6 Months")
+                if not df_expiring_filtered.empty:
+                    st.dataframe(df_expiring_filtered, use_container_width=True)
+                else:
+                    st.info("No records found.")
+            
+            # Download button for Report 1
+            buffer1 = io.BytesIO()
+            with pd.ExcelWriter(buffer1, engine='xlsxwriter') as writer:
+                df_18_months_filtered.to_excel(writer, sheet_name='COE Received 18M', index=False)
+                df_expiring_filtered.to_excel(writer, sheet_name='COE Expiring 6M', index=False)
+            
             st.download_button(
-                label="📥 Download COE Report",
-                data=buffer,
-                file_name=f"COE_Report_{datetime.now().date()}.xlsx",
+                label="📥 Download COE Expiry Report",
+                data=buffer1,
+                file_name=f"COE_Expiry_Report_{datetime.now().date()}.xlsx",
                 mime="application/vnd.ms-excel"
             )
             
             st.divider()
             
-            # --- EMAIL SECTION (Reused Logic) ---
-            st.header("📧 Email Report")
+            # ============================================
+            # REPORT 2: CURRENT MONTH COE SALES
+            # ============================================
+            st.header("📈 Report 2: Current Month COE Sales")
             
-            CONFIG_FILE = "config.json"
-
-            def load_config():
-                if os.path.exists(CONFIG_FILE):
-                    try:
-                        with open(CONFIG_FILE, "r") as f:
-                            return json.load(f)
-                    except:
-                        return {}
-                return {}
-
-            def save_config(email, password, recipients):
-                config_data = load_config() # Load existing to update
-                config_data["sender_email"] = email
-                config_data["sender_password"] = password
-                config_data["coe_recipients"] = recipients # Separate recipients for COE
-                with open(CONFIG_FILE, "w") as f:
-                    json.dump(config_data, f)
-
-            config = load_config()
+            # Filter for current month using column O (Date COE received)
+            current_month_start = datetime(today.year, today.month, 1)
+            mask_current_month = (df[date_coe_col] >= current_month_start) & (df[date_coe_col] <= today)
+            df_current_month = df[mask_current_month].copy()
             
-            with st.sidebar:
-                st.header("Email Configuration")
-                default_email = config.get("sender_email", "")
-                default_password = config.get("sender_password", "")
+            st.info(f"Showing data from {current_month_start.strftime('%b %d, %Y')} to {today.strftime('%b %d, %Y')}")
+            
+            if not df_current_month.empty:
+                # Column references
+                consultant_col = df.columns[46]  # Column AU
+                coe_type_col = df.columns[11]   # Column L
+                net_sales_col = df.columns[40]  # Column AO
                 
-                sender_email = st.text_input("Sender Email", value=default_email, key="coe_email")
-                sender_password = st.text_input("App Password", value=default_password, type="password", key="coe_pass")
-                st.info("Shared credentials with Visa Report.")
-
-            default_recipients = config.get("coe_recipients", "")
-            recipients = st.text_input("Recipients (comma separated)", value=default_recipients, key="coe_recipients")
+                # Clean data
+                df_current_month[consultant_col] = df_current_month[consultant_col].fillna('Unknown')
+                df_current_month[coe_type_col] = df_current_month[coe_type_col].fillna('Unknown')
+                df_current_month[net_sales_col] = pd.to_numeric(df_current_month[net_sales_col], errors='coerce').fillna(0)
+                
+                # Create pivot table
+                # Group by Consultant and COE Type
+                summary = df_current_month.groupby([consultant_col, coe_type_col]).agg({
+                    date_coe_col: 'count',  # Count of COE
+                    net_sales_col: 'sum'    # Sum of sales
+                }).reset_index()
+                
+                summary.columns = ['Sales Team', 'COE Type', 'No of CoE', 'Gross Sales']
+                
+                # Pivot to create the table format
+                pivot = summary.pivot(index='Sales Team', columns='COE Type', values=['No of CoE', 'Gross Sales'])
+                
+                # Calculate totals
+                totals = df_current_month.groupby(consultant_col).agg({
+                    date_coe_col: 'count',
+                    net_sales_col: 'sum'
+                }).reset_index()
+                totals.columns = ['Sales Team', 'Total No of CoE', 'Total Gross Sales']
+                
+                # Merge with pivot
+                final_table = totals.copy()
+                
+                # Add columns for each COE type
+                coe_types = summary['COE Type'].unique()
+                for coe_type in sorted(coe_types):
+                    type_data = summary[summary['COE Type'] == coe_type][['Sales Team', 'No of CoE', 'Gross Sales']]
+                    type_data.columns = ['Sales Team', f'{coe_type}_No', f'{coe_type}_Sales']
+                    final_table = final_table.merge(type_data, on='Sales Team', how='left')
+                
+                # Fill NaN with 0 or '-'
+                final_table = final_table.fillna(0)
+                
+                # Format for display
+                display_table = final_table.copy()
+                
+                # Display the table
+                st.dataframe(display_table, use_container_width=True)
+                
+                # Download button for Report 2
+                buffer2 = io.BytesIO()
+                with pd.ExcelWriter(buffer2, engine='xlsxwriter') as writer:
+                    display_table.to_excel(writer, sheet_name='Current Month Sales', index=False)
+                    df_current_month.to_excel(writer, sheet_name='Raw Data', index=False)
+                
+                st.download_button(
+                    label="📥 Download Current Month Sales Report",
+                    data=buffer2,
+                    file_name=f"COE_Sales_{today.strftime('%B_%Y')}.xlsx",
+                    mime="application/vnd.ms-excel"
+                )
+                
+            else:
+                st.warning("No COE records found for current month.")
             
-            with st.sidebar:
-                if st.button("💾 Save Configuration"):
-                    save_config(sender_email, sender_password, recipients)
-                    st.success("Configuration Saved!")
-
-            email_subject = st.text_input("Subject", f"Weekly COE Report - {datetime.now().date()}")
+        except Exception as e:
+            st.error(f"Error processing data: {e}")
+            st.write("**Debug Info:**")
+            st.write(f"Total columns: {len(df.columns)}")
+            st.write("Please verify column positions:")
+            st.write("- Column O (index 14): Date COE received")
+            st.write("- Column S (index 18): Course End date")
+            st.write("- Column L (index 11): COE Type")
+            st.write("- Column AU (index 46): Consultant")
+            st.write("- Column AO (index 40): Net sales")
             
-            default_body = f"""Hi Team,
-
-Please find attached the COE Report for {datetime.now().date()}.
-
-Summary:
-- Total Students: {len(df)}
-- Expiring < 6 Months: {len(df_expiring)}
-
-Regards,
-Report Automator"""
-
-            email_body = st.text_area("Email Draft", default_body, height=200)
-
-            if st.button("🚀 Send Email"):
-                if not sender_email or not sender_password:
-                    st.error("Please configure email settings in the sidebar")
-                else:
-                    try:
-                        import smtplib
-                        from email.mime.multipart import MIMEMultipart
-                        from email.mime.text import MIMEText
-                        from email.mime.base import MIMEBase
-                        from email import encoders
-
-                        msg = MIMEMultipart()
-                        msg['From'] = sender_email
-                        msg['To'] = recipients
-                        msg['Subject'] = email_subject
-
-                        msg.attach(MIMEText(email_body, 'plain'))
-
-                        part = MIMEBase('application', 'octet-stream')
-                        part.set_payload(buffer.getvalue())
-                        encoders.encode_base64(part)
-                        part.add_header('Content-Disposition', f"attachment; filename=COE_Report_{datetime.now().date()}.xlsx")
-                        msg.attach(part)
-
-                        server = smtplib.SMTP('smtp.gmail.com', 587)
-                        server.starttls()
-                        server.login(sender_email, sender_password)
-                        
-                        recipient_list = [r.strip() for r in recipients.split(',')]
-                        server.sendmail(sender_email, recipient_list, msg.as_string())
-                        server.quit()
-
-                        st.success(f"Email sent successfully to: {recipients}!")
-                    except Exception as e:
-                        st.error(f"Failed to send email. Error: {e}")
-
-        else:
-            st.error("Could not find a 'Date' column in the uploaded file. Please ensure there is a column like 'COE End Date'.")
-            st.write("Available columns:", df.columns.tolist())
-
     except Exception as e:
-        st.error(f"Error processing file: {e}")
+        st.error(f"Error loading file: {e}")
+        st.write("Please ensure you're uploading a valid Excel file.")
