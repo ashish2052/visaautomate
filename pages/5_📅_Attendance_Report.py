@@ -102,229 +102,297 @@ HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
     /* RESET & BASE STYLES */
-    :root {{
+    :root {
         --bg-color: #1a1f2e;
-        --card-bg: #2c3e50;
-        --text-color: white;
+        --card-bg: #232d3f;
+        --text-color: #ffffff;
+        --text-muted: #95a5a6;
         --green: #27ae60;
-        --blue: #3498db;
-        --red: #e74c3c;
-        --orange: #f39c12;
-    }}
-    body {{
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        --blue: #2980b9;
+        --red: #c0392b; /* Darker red for card bg */
+        --orange: #d35400; /* Darker orange for card bg */
+        --border-color: #34495e;
+    }
+    
+    * { box-sizing: border-box; }
+
+    body {
+        font-family: 'Inter', sans-serif;
         background-color: var(--bg-color);
         color: var(--text-color);
         margin: 0;
-        padding: 0;
+        padding: 20px;
         overflow-x: hidden;
-    }}
+    }
     
     /* DASHBOARD GRID */
-    .dashboard-container {{
+    .dashboard-container {
         display: flex;
         flex-direction: column;
         gap: 20px;
-        padding: 10px;
-    }}
+        max-width: 1400px;
+        margin: 0 auto;
+    }
     
     /* HEADER */
-    .header {{
-        background: linear-gradient(135deg, #3d5a80 0%, #2c3e50 100%);
-        padding: 20px;
-        border-radius: 10px;
-        text-align: center;
-        margin-bottom: 20px;
-    }}
-    .header h1 {{ margin: 0; font-size: 24px; }}
-    .header p {{ margin: 5px 0 0 0; color: #bdc3c7; font-size: 14px; }}
+    .header {
+        background: linear-gradient(90deg, #2c3e50 0%, #3d5a80 100%);
+        padding: 15px 20px;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        border-bottom: 2px solid #3498db;
+    }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0.5px; }
     
     /* METRIC CARDS ROW */
-    .metrics-row {{
+    .metrics-row {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 20px;
-    }}
+        gap: 15px;
+    }
     
-    .metric-card {{
-        border-radius: 10px;
-        padding: 20px;
+    .metric-card {
+        border-radius: 6px;
+        padding: 15px;
         text-align: center;
         color: white;
-        height: 120px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        height: 110px;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
         position: relative;
-    }}
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    }
     
-    .metric-title {{ font-size: 13px; text-transform: uppercase; margin-bottom: 10px; opacity: 0.9; }}
-    .metric-value {{ font-size: 42px; font-weight: bold; margin: 0; }}
-    .metric-hint {{ font-size: 11px; margin-top: 5px; opacity: 0.8; font-style: italic; }}
+    .metric-title { 
+        font-size: 12px; 
+        text-transform: uppercase; 
+        margin-bottom: 8px; 
+        font-weight: 600; 
+        opacity: 0.9; 
+        letter-spacing: 0.5px;
+    }
+    .metric-value { font-size: 38px; font-weight: 700; margin: 0; line-height: 1; }
+    .metric-hint { 
+        font-size: 10px; 
+        margin-top: 8px; 
+        opacity: 0.8; 
+        font-weight: 500;
+        background: rgba(0,0,0,0.1); 
+        padding: 2px 8px; 
+        border-radius: 10px; 
+    }
     
-    .card-green {{ background: linear-gradient(135deg, #27ae60 0%, #229954 100%); }}
-    .card-blue {{ background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); }}
-    .card-red {{ background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); cursor: pointer; transition: transform 0.2s; }}
-    .card-orange {{ background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); cursor: pointer; transition: transform 0.2s; }}
+    .card-green { background: #27ae60; }
+    .card-blue { background: #2980b9; }
+    .card-red { background: #c0392b; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .card-orange { background: #f39c12; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
     
-    .card-red:hover, .card-orange:hover {{ transform: scale(1.05); z-index: 10; }}
+    .card-red:hover, .card-orange:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.3); }
 
     /* MAIN CONTENT SPLIT */
-    .main-content {{
+    .main-content {
         display: grid;
-        grid-template-columns: 2fr 1.2fr;
-        gap: 20px;
-    }}
+        grid-template-columns: 1.2fr 1.2fr 1fr; /* 3 Columns: Compliant, Risk, Calendar */
+        gap: 15px;
+    }
     
-    /* TABLES SECTION */
-    .section-header {{
-        background: #2c3e50;
-        padding: 10px 15px;
-        border-radius: 8px 8px 0 0;
-        font-weight: bold;
-        border-bottom: 1px solid #34495e;
-    }}
-    
-    .data-table-container {{
-        background: #232d3f;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }}
-    
-    .data-row {{
+    /* SECTION CONTAINERS */
+    .section-container {
+        background: var(--card-bg);
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
         display: flex;
-        justify-content: space-between;
+        flex-direction: column;
+    }
+    
+    .section-header {
+        background: #34495e;
         padding: 12px 15px;
-        border-bottom: 1px solid #34495e;
-        align-items: center;
-    }}
-    .data-row:last-child {{ border-bottom: none; }}
-    
-    .emp-btn {{
-        background: transparent;
-        border: 1px solid #3498db;
-        color: #3498db;
-        padding: 5px 10px;
-        border-radius: 4px;
-        cursor: pointer;
         font-size: 14px;
-        text-align: left;
-    }}
-    .emp-btn:hover {{ background: #3498db; color: white; }}
+        font-weight: 600;
+        color: white;
+        border-bottom: 1px solid #2c3e50;
+    }
     
-    .metric-small {{ font-size: 14px; font-weight: bold; }}
-    .metric-label {{ font-size: 11px; color: #95a5a6; }}
+    /* TABLES */
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+    
+    .data-table th {
+        text-align: left;
+        padding: 10px 15px;
+        background: rgba(255,255,255,0.03);
+        color: var(--text-muted);
+        font-weight: 500;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 11px;
+        text-transform: uppercase;
+    }
+    
+    .data-table td {
+        padding: 10px 15px;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        color: #e0e0e0;
+    }
+    
+    .data-table tr:last-child td { border-bottom: none; }
+    
+    .emp-name {
+        font-weight: 500;
+        color: #ecf0f1;
+        cursor: pointer;
+        transition: color 0.2s;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .emp-name:hover { color: #3498db; text-decoration: underline; }
     
     /* CALENDAR SECTION */
-    .calendar-wrapper {{
-        background: #232d3f;
-        border-radius: 8px;
-        padding: 15px;
-    }}
-    .cal-controls {{ display: flex; gap: 10px; margin-bottom: 15px; }}
-    .cal-select {{ background: #34495e; color: white; border: none; padding: 5px; border-radius: 4px; flex: 1; }}
+    .calendar-body { padding: 15px; }
     
-    .cal-grid {{
+    .cal-controls { margin-bottom: 15px; }
+    .cal-select { 
+        width: 100%; 
+        background: #1a1f2e; 
+        color: white; 
+        border: 1px solid var(--border-color); 
+        padding: 8px; 
+        border-radius: 4px;
+        outline: none;
+        font-family: inherit;
+    }
+    
+    .cal-grid {
         display: grid;
         grid-template-columns: repeat(7, 1fr);
         gap: 4px;
-        margin-top: 10px;
-    }}
-    .cal-header {{ text-align: center; font-size: 11px; color: #95a5a6; padding-bottom: 5px; }}
-    .cal-day {{
+    }
+    .cal-header { 
+        text-align: center; 
+        font-size: 10px; 
+        color: var(--text-muted); 
+        padding-bottom: 5px; 
+        font-weight: 600;
+    }
+    .cal-day {
         aspect-ratio: 1;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 12px;
-        border-radius: 4px;
-        background: #2c3e50;
-    }}
-    .day-compliant {{ background: var(--green); }}
-    .day-late {{ background: var(--orange); }}
-    .day-risk {{ background: var(--red); }}
-    .day-empty {{ opacity: 0; }}
+        border-radius: 3px;
+        background: #34495e;
+        color: #bdc3c7;
+    }
+    .day-compliant { background: var(--green); color: white; }
+    .day-late { background: #f39c12; color: white; }
+    .day-risk { background: #e74c3c; color: white; }
+    .day-empty { background: transparent; }
     
-    /* MODAL OVERLAY */
-    .modal-overlay {{
+    /* SUMMARY STATS BELOW CALENDAR */
+    .summary-stats {
+        margin-top: 15px;
+        background: rgba(0,0,0,0.2);
+        padding: 10px;
+        border-radius: 4px;
+        font-size: 12px;
+    }
+    .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+    .stat-row:last-child { margin-bottom: 0; }
+    
+    /* MODAL */
+    .modal-overlay {
         display: none;
         position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.8);
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.7);
+        backdrop-filter: blur(2px);
         z-index: 1000;
         justify-content: center;
         align-items: center;
-    }}
+    }
     
-    .modal-content {{
-        background: #1a1f2e;
-        width: 80%;
+    .modal-content {
+        background: #232d3f;
+        width: 90%;
         max-width: 800px;
-        max-height: 80vh;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        max-height: 85vh;
+        border-radius: 8px;
+        box-shadow: 0 15px 30px rgba(0,0,0,0.5);
         display: flex;
         flex-direction: column;
-        overflow: hidden;
-        border: 1px solid #34495e;
-    }}
+        border: 1px solid var(--border-color);
+        animation: fadeIn 0.2s ease-out;
+    }
     
-    .modal-header {{
+    @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    
+    .modal-header {
         padding: 15px 20px;
         background: #2c3e50;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        font-weight: bold;
-        font-size: 18px;
-    }}
+        font-weight: 600;
+        font-size: 16px;
+        border-bottom: 1px solid var(--border-color);
+    }
     
-    .close-btn {{
+    .close-btn {
         background: none;
         border: none;
-        color: #95a5a6;
+        color: var(--text-muted);
         cursor: pointer;
-        font-size: 24px;
-    }}
-    .close-btn:hover {{ color: white; }}
+        font-size: 20px;
+        padding: 0 5px;
+    }
+    .close-btn:hover { color: white; }
     
-    .modal-body {{
-        padding: 20px;
+    .modal-body {
+        padding: 0;
         overflow-y: auto;
-    }}
+    }
     
-    /* SCROLLBAR */
-    ::-webkit-scrollbar {{ width: 8px; }}
-    ::-webkit-scrollbar-track {{ background: #1a1f2e; }}
-    ::-webkit-scrollbar-thumb {{ background: #34495e; border-radius: 4px; }}
-    ::-webkit-scrollbar-thumb:hover {{ background: #5d6d7e; }}
-    
-    /* HTML TABLE STYLES */
-    .detail-table {{
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 14px;
-    }}
-    .detail-table th {{ text-align: left; padding: 10px; border-bottom: 2px solid #34495e; color: #bdc3c7; }}
-    .detail-table td {{ padding: 10px; border-bottom: 1px solid #2c3e50; }}
-    .tag {{ padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }}
-    .tag-green {{ background: rgba(39, 174, 96, 0.2); color: #2ecc71; }}
-    .tag-orange {{ background: rgba(243, 156, 18, 0.2); color: #f1c40f; }}
-    .tag-red {{ background: rgba(231, 76, 60, 0.2); color: #e74c3c; }}
+    .detail-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .detail-table th { 
+        position: sticky; top: 0; 
+        background: #232d3f; 
+        padding: 12px 20px; 
+        text-align: left; 
+        border-bottom: 2px solid var(--border-color); 
+        color: var(--text-muted);
+        font-size: 11px;
+        text-transform: uppercase;
+    }
+    .detail-table td { padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .detail-table tr:hover { background: rgba(255,255,255,0.02); }
+
+    /* TAGS */
+    .status-badge { padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .badge-green { background: rgba(39, 174, 96, 0.2); color: #2ecc71; border: 1px solid rgba(39, 174, 96, 0.3); }
+    .badge-orange { background: rgba(243, 156, 18, 0.2); color: #f1c40f; border: 1px solid rgba(243, 156, 18, 0.3); }
+    .badge-red { background: rgba(231, 76, 60, 0.2); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.3); }
+
+    /* LAYOUT TWEAKS FOR 3-COL */
+    .col-left { grid-column: span 1; }
+    .col-mid { grid-column: span 1; }
+    .col-right { grid-column: span 1; }
 
 </style>
 </head>
 <body>
 
-<!-- DASHBOARD CONTENT -->
 <div class="dashboard-container">
     
     <!-- HEADER -->
@@ -332,7 +400,7 @@ HTML_TEMPLATE = """
         <h1>Monthly Management Snapshot</h1>
     </div>
 
-    <!-- METRICS ROW -->
+    <!-- METRICS -->
     <div class="metrics-row">
         <div class="metric-card card-green">
             <div class="metric-title">Avg Attendance</div>
@@ -354,147 +422,136 @@ HTML_TEMPLATE = """
         </div>
     </div>
 
-    <!-- MAIN CONTENT -->
+    <!-- MAIN GRID 3 COLUMNS -->
     <div class="main-content">
         
-        <!-- LEFT COLUMN: LISTS -->
-        <div class="left-col">
-            <!-- TOP 5 COMPLIANT -->
-            <div class="data-table-container">
-                <div class="section-header">Top 5 Best Compliant Employees</div>
-                <div id="list-compliant"></div>
-            </div>
-
-            <!-- TOP 5 RISK -->
-            <div class="data-table-container">
-                <div class="section-header">Top 5 Risk Employees</div>
-                <div id="list-risk"></div>
-            </div>
+        <!-- COL 1: TOP 5 COMPLIANT -->
+        <div class="section-container col-left">
+            <div class="section-header">Top 5 Best Compliant Employees</div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th style="text-align:center;">Avg Hrs</th>
+                        <th style="text-align:center;">Dev</th>
+                    </tr>
+                </thead>
+                <tbody id="list-compliant"></tbody>
+            </table>
         </div>
 
-        <!-- RIGHT COLUMN: CALENDAR -->
-        <div class="right-col">
-            <div class="calendar-wrapper">
-                <div class="section-header" style="margin: -15px -15px 15px -15px; border-radius: 8px 8px 0 0;">Employee Calendar & Stats</div>
-                
+        <!-- COL 2: TOP 5 RISK -->
+        <div class="section-container col-mid">
+            <div class="section-header">Top 5 Risk Employees</div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th style="text-align:center;">Late</th>
+                        <th style="text-align:center;">Early</th>
+                        <th style="text-align:center;">Risk</th>
+                    </tr>
+                </thead>
+                <tbody id="list-risk"></tbody>
+            </table>
+        </div>
+
+        <!-- COL 3: CALENDAR -->
+        <div class="section-container col-right">
+            <div class="section-header">Employee Calendar & Stats</div>
+            <div class="calendar-body">
                 <div class="cal-controls">
                     <select id="emp-select" class="cal-select" onchange="renderCalendar()"></select>
                 </div>
                 
-                <!-- Weekday Headers -->
                 <div class="cal-grid" style="margin-bottom: 5px;">
-                    <div class="cal-header">SUN</div><div class="cal-header">MON</div>
-                    <div class="cal-header">TUE</div><div class="cal-header">WED</div>
-                    <div class="cal-header">THU</div><div class="cal-header">FRI</div>
-                    <div class="cal-header">SAT</div>
+                    <div class="cal-header">S</div><div class="cal-header">M</div>
+                    <div class="cal-header">T</div><div class="cal-header">W</div>
+                    <div class="cal-header">T</div><div class="cal-header">F</div>
+                    <div class="cal-header">S</div>
                 </div>
                 
-                <!-- Calendar Days -->
                 <div id="calendar-grid" class="cal-grid"></div>
                 
-                <!-- Summary Stats -->
-                <div id="emp-summary" style="margin-top: 15px; font-size: 13px;"></div>
+                <div id="emp-summary" class="summary-stats"></div>
             </div>
         </div>
-    </div>
 
+    </div>
 </div>
 
-<!-- MODAL OVERLAY -->
-<div id="modal" class="modal-overlay" onclick="if(event.target === this) closeModal()">
+<!-- MODAL -->
+<div id="modal" class="modal-overlay" onclick="handleOverlayClick(event)">
     <div class="modal-content">
         <div class="modal-header">
             <span id="modal-title">Details</span>
             <button class="close-btn" onclick="closeModal()">×</button>
         </div>
-        <div class="modal-body" id="modal-body">
-            <!-- Dynamic Content -->
-        </div>
+        <div class="modal-body" id="modal-body"></div>
     </div>
 </div>
 
 <script>
-    // DATA INJECTION POINT
     const stats = {STATS_JSON};
     const dailyData = {DAILY_JSON};
     
-    // UTILS
-    function init() {{
+    function init() {
         updateMetrics();
         renderTopLists();
         populateEmployeeSelect();
-        renderCalendar(); // Initial render for first employee
-    }}
+        renderCalendar();
+    }
 
-    function updateMetrics() {{
-        const totalEmp = stats.length;
-        if(totalEmp === 0) return;
+    function updateMetrics() {
+        if(stats.length === 0) return;
+        const avgAtt = stats.reduce((sum, s) => sum + s.AttendancePct, 0) / stats.length;
+        const avgHrs = stats.reduce((sum, s) => sum + s.AvgWorkHours, 0) / stats.length;
+        const chronic = stats.filter(s => s.ChronicLate).length;
+        const under = stats.filter(s => s.UnderHours).length;
 
-        const avgAtt = stats.reduce((sum, s) => sum + s.AttendancePct, 0) / totalEmp;
-        const avgHrs = stats.reduce((sum, s) => sum + s.AvgWorkHours, 0) / totalEmp;
-        const chronicCount = stats.filter(s => s.ChronicLate).length;
-        const underCount = stats.filter(s => s.UnderHours).length;
+        setText('val-attendance', Math.round(avgAtt) + '%');
+        setText('val-hours', avgHrs.toFixed(1) + ' hrs');
+        setText('val-chronic', Math.round((chronic / stats.length) * 100) + '%');
+        setText('val-under', Math.round((under / stats.length) * 100) + '%');
+    }
 
-        document.getElementById('val-attendance').textContent = Math.round(avgAtt) + '%';
-        document.getElementById('val-hours').textContent = avgHrs.toFixed(1) + ' hrs';
-        document.getElementById('val-chronic').textContent = Math.round((chronicCount / totalEmp) * 100) + '%';
-        document.getElementById('val-under').textContent = Math.round((underCount / totalEmp) * 100) + '%';
-    }}
-
-    function renderTopLists() {{
-        // Top 5 Compliant
+    function renderTopLists() {
+        // Compliant List
         const compliant = [...stats].sort((a,b) => b.AvgWorkHours - a.AvgWorkHours).slice(0, 5);
-        const compContainer = document.getElementById('list-compliant');
-        compContainer.innerHTML = compliant.map(emp => `
-            <div class="data-row">
-                <button class="emp-btn" onclick="openEmpDetail('${emp.Employee}')">👤 ${emp.Employee}</button>
-                <div style="text-align: right;">
-                    <div class="metric-small">${emp.AvgWorkHours.toFixed(1)} hrs</div>
-                    <div class="metric-label">Avg Hours</div>
-                </div>
-                <div style="text-align: right; width: 60px;">
-                    <div class="metric-small">${emp.AvgDeviation}</div>
-                    <div class="metric-label">Dev</div>
-                </div>
-            </div>
+        document.getElementById('list-compliant').innerHTML = compliant.map(emp => `
+            <tr>
+                <td><div class="emp-name" onclick="openEmpDetail('${emp.Employee}')">👤 ${emp.Employee}</div></td>
+                <td style="text-align:center; font-weight:600; color:#2ecc71;">${emp.AvgWorkHours.toFixed(1)}</td>
+                <td style="text-align:center; color:#95a5a6;">${emp.AvgDeviation > 0 ? '+'+emp.AvgDeviation : emp.AvgDeviation}</td>
+            </tr>
         `).join('');
 
-        // Top 5 Risk
+        // Risk List
         const risk = [...stats].sort((a,b) => b.TotalRiskDays - a.TotalRiskDays).slice(0, 5);
-        const riskContainer = document.getElementById('list-risk');
-        riskContainer.innerHTML = risk.map(emp => `
-            <div class="data-row">
-                <button class="emp-btn" onclick="openEmpDetail('${emp.Employee}')">⚠️ ${emp.Employee}</button>
-                <div style="text-align: right;">
-                    <div class="metric-small">${emp.LateDays}</div>
-                    <div class="metric-label">Late</div>
-                </div>
-                 <div style="text-align: right;">
-                    <div class="metric-small">${emp.EarlyExitDays}</div>
-                    <div class="metric-label">Early</div>
-                </div>
-                <div style="text-align: right; width: 50px;">
-                    <div class="metric-small" style="color: #e74c3c;">${emp.TotalRiskDays}</div>
-                    <div class="metric-label">Risk</div>
-                </div>
-            </div>
+        document.getElementById('list-risk').innerHTML = risk.map(emp => `
+            <tr>
+                <td><div class="emp-name" onclick="openEmpDetail('${emp.Employee}')">⚠️ ${emp.Employee}</div></td>
+                <td style="text-align:center;">${emp.LateDays}</td>
+                <td style="text-align:center;">${emp.EarlyExitDays}</td>
+                <td style="text-align:center; font-weight:bold; color:#e74c3c;">${emp.TotalRiskDays}</td>
+            </tr>
         `).join('');
-    }}
+    }
 
-    function populateEmployeeSelect() {{
+    function populateEmployeeSelect() {
         const select = document.getElementById('emp-select');
-        stats.sort((a,b) => a.Employee.localeCompare(b.Employee)).forEach(s => {{
+        stats.sort((a,b) => a.Employee.localeCompare(b.Employee)).forEach(s => {
             const opt = document.createElement('option');
             opt.value = s.Employee;
             opt.textContent = s.Employee;
             select.appendChild(opt);
-        }});
-    }}
+        });
+    }
 
-    function renderCalendar() {{
+    function renderCalendar() {
         const empName = document.getElementById('emp-select').value;
         const container = document.getElementById('calendar-grid');
-        const summaryDiv = document.getElementById('emp-summary');
+        const summary = document.getElementById('emp-summary');
         container.innerHTML = '';
         
         if(!empName) return;
@@ -502,138 +559,99 @@ HTML_TEMPLATE = """
         const records = dailyData.filter(d => d.Employee === empName);
         if(records.length === 0) return;
 
-        // Determine month from first record
         const dateObj = new Date(records[0].Date);
         const year = dateObj.getFullYear();
-        const month = dateObj.getMonth(); // 0-indexed
+        const month = dateObj.getMonth();
         
-        // Month stats
         const empStats = stats.find(s => s.Employee === empName);
-        summaryDiv.innerHTML = `
-            <div style="display:flex; justify-content:space-between; border-bottom:1px solid #34495e; padding:5px 0;">
-                <span>Present: <b>${empStats.PresentDays}</b></span>
-                <span style="color:#f39c12">Late: <b>${empStats.LateDays}</b></span>
-            </div>
-            <div style="display:flex; justify-content:space-between; padding:5px 0;">
-                <span style="color:#e74c3c">Early Exit: <b>${empStats.EarlyExitDays}</b></span>
-                <span style="color:#3498db">Avg: <b>${empStats.AvgWorkHours.toFixed(1)}h</b></span>
-            </div>
+        summary.innerHTML = `
+            <div class="stat-row"><span>Present:</span> <b>${empStats.PresentDays}</b></div>
+            <div class="stat-row"><span>Late:</span> <b style="color:#f39c12">${empStats.LateDays}</b></div>
+            <div class="stat-row"><span>Early Exit:</span> <b style="color:#e74c3c">${empStats.EarlyExitDays}</b></div>
+            <div class="stat-row"><span>Avg Hours:</span> <b style="color:#3498db">${empStats.AvgWorkHours.toFixed(1)}</b></div>
         `;
 
-        // Generate grid
-        const firstDay = new Date(year, month, 1).getDay(); // 0 = Sun
+        const firstDay = new Date(year, month, 1).getDay();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-        // Empty cells for starting offset
-        for(let i=0; i<firstDay; i++) {{
-            container.innerHTML += '<div class="cal-day day-empty"></div>';
-        }}
+        for(let i=0; i<firstDay; i++) container.insertAdjacentHTML('beforeend', '<div class="cal-day day-empty"></div>');
 
-        // Days
-        for(let d=1; d<=daysInMonth; d++) {{
+        for(let d=1; d<=daysInMonth; d++) {
             const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             const rec = records.find(r => r.Date === dateStr);
-            
-            let className = 'cal-day';
-            if(rec) {{
-                if(rec.IsCompliant) className += ' day-compliant';
-                else if(rec.IsLate || rec.IsEarlyExit) className += ' day-late';
-                else className += ' day-risk';
-            }} else {{
-                className += ' day-empty';
-            }}
+            let cls = 'cal-day';
+            if(rec) {
+                if(rec.IsCompliant) cls += ' day-compliant';
+                else if(rec.IsLate || rec.IsEarlyExit) cls += ' day-late';
+                else cls += ' day-risk';
+            } else {
+                cls += ' day-empty';
+            }
+            container.insertAdjacentHTML('beforeend', `<div class="${cls}">${rec ? d : ''}</div>`);
+        }
+    }
 
-            container.innerHTML += `<div class="${className}">${rec ? d : '-'}</div>`;
-        }}
-    }}
-
-    // MODAL LOGIC
-    function openModal(type) {{
-        const modal = document.getElementById('modal');
+    function openModal(type) {
+        showModal();
         const title = document.getElementById('modal-title');
-        const body = document.getElementById('modal-body');
-        
-        modal.style.display = 'flex';
-        
-        if(type === 'chronic') {{
+        if(type === 'chronic') {
             title.textContent = '🔴 Chronic Late Employees (≥20%)';
-            const data = stats.filter(s => s.ChronicLate);
-            renderTable(data, ['Employee', 'LateDays', 'PresentDays'], ['Employee', 'Late Days', 'Total Days']);
-        }} else if (type === 'under') {{
+            renderTable(stats.filter(s => s.ChronicLate), 
+                ['Employee', 'LateDays', 'PresentDays'], 
+                ['Employee', 'Late Days', 'Days Present']);
+        } else if(type === 'under') {
             title.textContent = '🟠 Employees Under 8 Hours Avg';
-            const data = stats.filter(s => s.UnderHours);
-            renderTable(data, ['Employee', 'AvgWorkHours', 'PresentDays'], ['Employee', 'Avg Hours', 'Days Present']);
-        }}
-    }}
-    
-    function openEmpDetail(empName) {{
-        const modal = document.getElementById('modal');
-        const title = document.getElementById('modal-title');
-        modal.style.display = 'flex';
-        title.textContent = '👤 ' + empName;
-        
-        const records = dailyData.filter(d => d.Employee === empName);
-        renderDetailTable(records);
-    }}
+            renderTable(stats.filter(s => s.UnderHours), 
+                ['Employee', 'AvgWorkHours', 'PresentDays'], 
+                ['Employee', 'Avg Hours', 'Days Present']);
+        }
+    }
 
-    function closeModal() {{
-        document.getElementById('modal').style.display = 'none';
-    }}
+    function openEmpDetail(empName) {
+        showModal();
+        document.getElementById('modal-title').textContent = '👤 ' + empName;
+        renderDetailTable(dailyData.filter(d => d.Employee === empName));
+    }
 
-    function renderTable(data, keys, headers) {{
-        const body = document.getElementById('modal-body');
-        let html = '<table class="detail-table"><thead><tr>';
-        headers.forEach(h => html += `<th>${h}</th>`);
-        html += '</tr></thead><tbody>';
-        
-        data.forEach(row => {{
-            html += '<tr>';
-            keys.forEach(k => {{
-                let val = row[k];
-                if(typeof val === 'number' && !Number.isInteger(val)) val = val.toFixed(1);
-                html += `<td>${val}</td>`;
-            }});
-            html += '</tr>';
-        }});
-        html += '</tbody></table>';
-        body.innerHTML = html;
-    }}
+    function renderTable(data, keys, headers) {
+        let hHtml = ''; headers.forEach(h => hHtml += `<th>${h}</th>`);
+        let bHtml = '';
+        data.forEach(row => {
+            bHtml += '<tr>';
+            keys.forEach(k => bHtml += `<td>${typeof row[k] === 'number' && !Number.isInteger(row[k]) ? row[k].toFixed(1) : row[k]}</td>`);
+            bHtml += '</tr>';
+        });
+        document.getElementById('modal-body').innerHTML = `<table class="detail-table"><thead><tr>${hHtml}</tr></thead><tbody>${bHtml}</tbody></table>`;
+    }
 
-    function renderDetailTable(records) {{
-        const body = document.getElementById('modal-body');
-        let html = `<table class="detail-table">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Entry</th>
-                    <th>Exit</th>
-                    <th>Hours</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>`;
-            
-        records.forEach(r => {{
-            let tagClass = 'tag-green';
-            if(r.IsLate || r.IsEarlyExit) tagClass = 'tag-orange';
-            if(!r.IsCompliant && !r.IsLate && !r.IsEarlyExit) tagClass = 'tag-red';
+    function renderDetailTable(records) {
+        let html = '';
+        records.forEach(r => {
+            let badge = 'badge-green';
+            if(r.IsLate || r.IsEarlyExit) badge = 'badge-orange';
+            if(!r.IsCompliant && !r.IsLate && !r.IsEarlyExit) badge = 'badge-red';
             
             html += `<tr>
                 <td>${r.Date}</td>
                 <td>${r.FirstIn}</td>
                 <td>${r.LastOut}</td>
                 <td><strong>${r.WorkHours}</strong></td>
-                <td><span class="tag ${tagClass}">${r.Note}</span></td>
+                <td><span class="status-badge ${badge}">${r.Note}</span></td>
             </tr>`;
-        }});
-        
-        html += '</tbody></table>';
-        body.innerHTML = html;
-    }}
+        });
+        document.getElementById('modal-body').innerHTML = `
+            <table class="detail-table">
+                <thead><tr><th>Date</th><th>Entry</th><th>Exit</th><th>Hours</th><th>Status</th></tr></thead>
+                <tbody>${html}</tbody>
+            </table>`;
+    }
 
-    // Init
+    function showModal() { document.getElementById('modal').style.display = 'flex'; }
+    function closeModal() { document.getElementById('modal').style.display = 'none'; }
+    function handleOverlayClick(e) { if(e.target.id === 'modal') closeModal(); }
+    function setText(id, txt) { document.getElementById(id).textContent = txt; }
+
     init();
-
 </script>
 </body>
 </html>
