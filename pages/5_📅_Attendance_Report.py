@@ -280,7 +280,14 @@ uploaded_file = st.file_uploader("Upload Monthly Attendance Excel", type=['xlsx'
 
 if uploaded_file:
     try:
-        df = pd.read_excel(uploaded_file, header=0)
+        # Determine engine based on extension
+        file_ext = uploaded_file.name.split('.')[-1].lower()
+        if file_ext == 'xls':
+            engine = 'xlrd'
+        else:
+            engine = 'openpyxl'
+            
+        df = pd.read_excel(uploaded_file, header=0, engine=engine)
         df_daily = process_attendance_simple(df)
         
         if df_daily is not None:
