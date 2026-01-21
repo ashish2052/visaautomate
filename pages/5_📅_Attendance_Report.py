@@ -158,15 +158,44 @@ HTML_TEMPLATE = """
         margin: 0 auto;
     }
     
-    /* HEADER */
+    /* HEADER WITH ACTIONS */
     .header {
         background: linear-gradient(90deg, #2c3e50 0%, #3d5a80 100%);
         padding: 15px 20px;
         border-radius: 6px;
         margin-bottom: 10px;
         border-bottom: 2px solid #3498db;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
     .header h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0.5px; }
+    
+    .action-btn {
+        background: #e74c3c;
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 4px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: background 0.2s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .action-btn:hover { background: #c0392b; transform: translateY(-1px); }
+    .action-btn:active { transform: translateY(0); }
+
+    /* CHECKBOXES */
+    .row-check {
+        cursor: pointer;
+        width: 16px;
+        height: 16px;
+        accent-color: #3498db;
+    }
     
     /* METRIC CARDS ROW */
     .metrics-row {
@@ -174,7 +203,7 @@ HTML_TEMPLATE = """
         grid-template-columns: repeat(4, 1fr);
         gap: 15px;
     }
-    
+    /* ... (metrics styles same as before) ... */
     .metric-card {
         border-radius: 6px;
         padding: 15px;
@@ -188,31 +217,14 @@ HTML_TEMPLATE = """
         position: relative;
         box-shadow: 0 4px 6px rgba(0,0,0,0.2);
     }
-    
-    .metric-title { 
-        font-size: 12px; 
-        text-transform: uppercase; 
-        margin-bottom: 8px; 
-        font-weight: 600; 
-        opacity: 0.9; 
-        letter-spacing: 0.5px;
-    }
+    .metric-title { font-size: 12px; text-transform: uppercase; margin-bottom: 8px; font-weight: 600; opacity: 0.9; letter-spacing: 0.5px;}
     .metric-value { font-size: 38px; font-weight: 700; margin: 0; line-height: 1; }
-    .metric-hint { 
-        font-size: 10px; 
-        margin-top: 8px; 
-        opacity: 0.8; 
-        font-weight: 500;
-        background: rgba(0,0,0,0.1); 
-        padding: 2px 8px; 
-        border-radius: 10px; 
-    }
+    .metric-hint { font-size: 10px; margin-top: 8px; opacity: 0.8; font-weight: 500; background: rgba(0,0,0,0.1); padding: 2px 8px; border-radius: 10px; }
     
     .card-green { background: #27ae60; }
     .card-blue { background: #2980b9; }
     .card-red { background: #c0392b; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
     .card-orange { background: #f39c12; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
-    
     .card-red:hover, .card-orange:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.3); }
 
     /* MAIN CONTENT SPLIT */
@@ -220,6 +232,7 @@ HTML_TEMPLATE = """
         display: grid;
         grid-template-columns: 1.2fr 1.2fr 1fr; /* 3 Columns */
         gap: 15px;
+        align-items: stretch; /* Ensure columns stretch to fill height */
     }
     
     /* SECTION CONTAINERS */
@@ -230,6 +243,7 @@ HTML_TEMPLATE = """
         border: 1px solid var(--border-color);
         display: flex;
         flex-direction: column;
+        flex: 1; /* allow growing */
     }
 
     .col-left {
@@ -240,8 +254,10 @@ HTML_TEMPLATE = """
         gap: 15px;
         display: flex;
         flex-direction: column;
+        justify-content: flex-start; /* Stack from top */
     }
-    
+
+    /* ... (rest of CSS same until modal body) ... */
     .section-header {
         background: #34495e;
         padding: 12px 15px;
@@ -250,165 +266,49 @@ HTML_TEMPLATE = """
         color: white;
         border-bottom: 1px solid #2c3e50;
     }
-    
-    /* TABLES */
-    .data-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 13px;
-    }
-    
-    .data-table th {
-        text-align: left;
-        padding: 10px 15px;
-        background: rgba(255,255,255,0.03);
-        color: var(--text-muted);
-        font-weight: 500;
-        border-bottom: 1px solid var(--border-color);
-        font-size: 11px;
-        text-transform: uppercase;
-    }
-    
-    .data-table td {
-        padding: 10px 15px;
-        border-bottom: 1px solid rgba(255,255,255,0.05);
-        color: #e0e0e0;
-    }
-    
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table th { text-align: left; padding: 10px 15px; background: rgba(255,255,255,0.03); color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--border-color); font-size: 11px; text-transform: uppercase; }
+    .data-table td { padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #e0e0e0; }
     .data-table tr:last-child td { border-bottom: none; }
-    
-    .emp-name {
-        font-weight: 500;
-        color: #ecf0f1;
-        cursor: pointer;
-        transition: color 0.2s;
-        text-decoration: none;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
+    .emp-name { font-weight: 500; color: #ecf0f1; cursor: pointer; transition: color 0.2s; text-decoration: none; display: flex; align-items: center; gap: 8px; }
     .emp-name:hover { color: #3498db; text-decoration: underline; }
     
-    /* CALENDAR SECTION */
+    /* ... (Calendar styles same) ... */
     .calendar-body { padding: 15px; }
-    
     .cal-controls { margin-bottom: 15px; }
-    .cal-select { 
-        width: 100%; 
-        background: #1a1f2e; 
-        color: white; 
-        border: 1px solid var(--border-color); 
-        padding: 8px; 
-        border-radius: 4px;
-        outline: none;
-        font-family: inherit;
-    }
-    
-    .cal-grid {
-        display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        gap: 4px;
-    }
-    .cal-header { 
-        text-align: center; 
-        font-size: 10px; 
-        color: var(--text-muted); 
-        padding-bottom: 5px; 
-        font-weight: 600;
-    }
-    .cal-day {
-        aspect-ratio: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        border-radius: 3px;
-        background: #34495e;
-        color: #bdc3c7;
-    }
+    .cal-select { width: 100%; background: #1a1f2e; color: white; border: 1px solid var(--border-color); padding: 8px; border-radius: 4px; outline: none; font-family: inherit; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal-header { text-align: center; font-size: 10px; color: var(--text-muted); padding-bottom: 5px; font-weight: 600; }
+    .cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 12px; border-radius: 3px; background: #34495e; color: #bdc3c7; }
     .day-compliant { background: var(--green); color: white; }
     .day-late { background: #f39c12; color: white; }
     .day-risk { background: #e74c3c; color: white; }
     .day-empty { background: transparent; }
     .day-neutral { background: #2c3e50; color: #5d6d7e; opacity: 0.5; }
-    
-    /* SUMMARY STATS BELOW CALENDAR */
-    .summary-stats {
-        margin-top: 15px;
-        background: rgba(0,0,0,0.2);
-        padding: 10px;
-        border-radius: 4px;
-        font-size: 12px;
-    }
-    .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
-    .stat-row:last-child { margin-bottom: 0; }
+    .summary-stats { margin-top: 15px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 4px; font-size: 12px; }
+    .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; } .stat-row:last-child { margin-bottom: 0; }
     
     /* MODAL */
-    .modal-overlay {
-        display: none;
-        position: fixed;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0,0,0,0.7);
-        backdrop-filter: blur(2px);
-        z-index: 1000;
-        justify-content: center;
-        align-items: center;
-    }
-    
-    .modal-content {
-        background: #232d3f;
-        width: 90%;
-        max-width: 800px;
-        max-height: 85vh;
-        border-radius: 8px;
-        box-shadow: 0 15px 30px rgba(0,0,0,0.5);
-        display: flex;
-        flex-direction: column;
-        border: 1px solid var(--border-color);
-        animation: fadeIn 0.2s ease-out;
-    }
-    
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(2px); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-content { background: #232d3f; width: 90%; max-width: 800px; max-height: 85vh; border-radius: 8px; box-shadow: 0 15px 30px rgba(0,0,0,0.5); display: flex; flex-direction: column; border: 1px solid var(--border-color); animation: fadeIn 0.2s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-    
-    .modal-header {
-        padding: 15px 20px;
-        background: #2c3e50;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-weight: 600;
-        font-size: 16px;
-        border-bottom: 1px solid var(--border-color);
-    }
-    
-    .close-btn {
-        background: none;
-        border: none;
-        color: var(--text-muted);
-        cursor: pointer;
-        font-size: 20px;
-        padding: 0 5px;
-    }
-    .close-btn:hover { color: white; }
-    
-    .modal-body {
-        padding: 0;
-        overflow-y: auto;
-    }
-    
+    .modal-header { padding: 15px 20px; background: #2c3e50; display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 16px; border-bottom: 1px solid var(--border-color); }
+    .close-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px; padding: 0 5px; } .close-btn:hover { color: white; }
+    .modal-body { padding: 0; overflow-y: auto; }
     .detail-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .detail-table th { 
-        position: sticky; top: 0; 
-        background: #232d3f; 
-        padding: 12px 20px; 
-        text-align: left; 
-        border-bottom: 2px solid var(--border-color); 
-        color: var(--text-muted);
-        font-size: 11px;
-        text-transform: uppercase;
-    }
+    .detail-table th { position: sticky; top: 0; background: #232d3f; padding: 12px 20px; text-align: left; border-bottom: 2px solid var(--border-color); color: var(--text-muted); font-size: 11px; text-transform: uppercase; }
     .detail-table td { padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); }
     .detail-table tr:hover { background: rgba(255,255,255,0.02); }
+    
+    /* DRAFT EMAIL STYLES */
+    .email-container { padding: 20px; border-bottom: 1px solid var(--border-color); }
+    .email-subject { font-weight: 700; color: white; margin-bottom: 10px; font-size: 16px; border-bottom: 1px dashed #555; padding-bottom: 10px; }
+    .email-body { font-family: 'Courier New', monospace; color: #ecf0f1; line-height: 1.6; white-space: pre-wrap; font-size: 14px; }
+    .email-table { width: 100%; margin: 15px 0; border: 1px solid #555; border-collapse: collapse; }
+    .email-table th { background: #333; color: white; padding: 5px; border: 1px solid #555; text-align: left; }
+    .email-table td { padding: 5px; border: 1px solid #555; color: #ddd; }
+    .copy-btn { margin-top: 10px; background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .copy-btn:hover { background: #2980b9; }
 
     /* TAGS */
     .status-badge { padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; }
@@ -416,7 +316,6 @@ HTML_TEMPLATE = """
     .badge-orange { background: rgba(243, 156, 18, 0.2); color: #f1c40f; border: 1px solid rgba(243, 156, 18, 0.3); }
     .badge-red { background: rgba(231, 76, 60, 0.2); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.3); }
 
-    /* LAYOUT TWEAKS FOR 3-COL */
     .col-mid { grid-column: span 1; }
     .col-right { grid-column: span 1; }
 
@@ -430,6 +329,9 @@ HTML_TEMPLATE = """
     <!-- HEADER -->
     <div class="header">
         <h1>Monthly Management Snapshot</h1>
+        <button class="action-btn" onclick="generateEmails()">
+            📩 Generate Warning Drafts
+        </button>
     </div>
 
     <!-- METRICS -->
@@ -459,28 +361,24 @@ HTML_TEMPLATE = """
         
         <!-- COL 1 (LEFT): STACKED COMPLIANT + LATE -->
         <div class="col-left">
-            
             <!-- TOP 5 COMPLIANT -->
             <div class="section-container">
                 <div class="section-header">Top 5 Best Compliant Employees</div>
                 <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Employee</th>
-                            <th style="text-align:center;">Avg Hrs</th>
-                            <th style="text-align:center;">Days</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Employee</th><th style="text-align:center;">Avg Hrs</th><th style="text-align:center;">Days</th></tr></thead>
                     <tbody id="list-compliant"></tbody>
                 </table>
             </div>
-
             <!-- TOP 5 LATE (NEW) -->
             <div class="section-container">
-                <div class="section-header">Top 5 Late Employees</div>
+                <div class="section-header" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>Top 5 Late Employees</span>
+                    <span style="font-size:10px; opacity:0.7;">Select to Mail</span>
+                </div>
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th width="30"></th> <!-- Checkbox -->
                             <th>Employee</th>
                             <th style="text-align:center;">Late</th>
                             <th style="text-align:center;">Risk</th>
@@ -489,15 +387,18 @@ HTML_TEMPLATE = """
                     <tbody id="list-late"></tbody>
                 </table>
             </div>
-
         </div>
 
         <!-- COL 2: TOP 10 RISK -->
         <div class="section-container col-mid">
-            <div class="section-header">Top 10 Risk Employees</div>
+            <div class="section-header" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>Top 10 Risk Employees</span>
+                <span style="font-size:10px; opacity:0.7;">Select to Mail</span>
+            </div>
             <table class="data-table">
                 <thead>
                     <tr>
+                        <th width="30"></th> <!-- Checkbox -->
                         <th>Employee</th>
                         <th style="text-align:center;">Late</th>
                         <th style="text-align:center;">Early</th>
@@ -515,16 +416,10 @@ HTML_TEMPLATE = """
                 <div class="cal-controls">
                     <select id="emp-select" class="cal-select" onchange="renderCalendar()"></select>
                 </div>
-                
                 <div class="cal-grid" style="margin-bottom: 5px;">
-                    <div class="cal-header">S</div><div class="cal-header">M</div>
-                    <div class="cal-header">T</div><div class="cal-header">W</div>
-                    <div class="cal-header">T</div><div class="cal-header">F</div>
-                    <div class="cal-header">S</div>
+                    <div class="cal-header">S</div><div class="cal-header">M</div><div class="cal-header">T</div><div class="cal-header">W</div><div class="cal-header">T</div><div class="cal-header">F</div><div class="cal-header">S</div>
                 </div>
-                
                 <div id="calendar-grid" class="cal-grid"></div>
-                
                 <div id="emp-summary" class="summary-stats"></div>
             </div>
         </div>
@@ -553,14 +448,14 @@ HTML_TEMPLATE = """
         populateEmployeeSelect();
         renderCalendar();
     }
-
+    
+    // ... (updateMetrics same as before) ...
     function updateMetrics() {
         if(stats.length === 0) return;
         const avgAtt = stats.reduce((sum, s) => sum + s.AttendancePct, 0) / stats.length;
         const avgHrs = stats.reduce((sum, s) => sum + s.AvgWorkHours, 0) / stats.length;
         const chronic = stats.filter(s => s.ChronicLate).length;
         const under = stats.filter(s => s.UnderHours).length;
-
         setText('val-attendance', Math.round(avgAtt) + '%');
         setText('val-hours', avgHrs.toFixed(1) + ' hrs');
         setText('val-chronic', Math.round((chronic / stats.length) * 100) + '%');
@@ -568,13 +463,11 @@ HTML_TEMPLATE = """
     }
 
     function renderTopLists() {
-        // Compliant List: Sort by CompliantDays desc, then AvgHours desc
-        // This ensures the "Best" are those who are actually compliant most often.
+        // Compliant
         const compliant = [...stats].sort((a,b) => {
             if (b.CompliantDays !== a.CompliantDays) return b.CompliantDays - a.CompliantDays;
             return b.AvgWorkHours - a.AvgWorkHours;
         }).slice(0, 5);
-        
         document.getElementById('list-compliant').innerHTML = compliant.map(emp => `
             <tr>
                 <td><div class="emp-name" onclick="openEmpDetail('${emp.Employee}')">👤 ${emp.Employee}</div></td>
@@ -583,20 +476,22 @@ HTML_TEMPLATE = """
             </tr>
         `).join('');
 
-        // Late List (NEW): Sort by LateDays desc
+        // Late (Checkbox)
         const late = [...stats].sort((a,b) => b.LateDays - a.LateDays).slice(0, 5);
         document.getElementById('list-late').innerHTML = late.map(emp => `
             <tr>
+                <td style="text-align:center;"><input type="checkbox" class="row-check" value="${emp.Employee}" onchange="toggleSelect(this)"></td>
                 <td><div class="emp-name" onclick="openEmpDetail('${emp.Employee}')">🕒 ${emp.Employee}</div></td>
                 <td style="text-align:center; color:#f39c12; font-weight:bold;">${emp.LateDays}</td>
                 <td style="text-align:center;">${emp.TotalRiskDays}</td>
             </tr>
         `).join('');
 
-        // Risk List
+        // Risk (Checkbox)
         const risk = [...stats].sort((a,b) => b.TotalRiskDays - a.TotalRiskDays).slice(0, 10);
         document.getElementById('list-risk').innerHTML = risk.map(emp => `
             <tr>
+                <td style="text-align:center;"><input type="checkbox" class="row-check" value="${emp.Employee}" onchange="toggleSelect(this)"></td>
                 <td><div class="emp-name" onclick="openEmpDetail('${emp.Employee}')">⚠️ ${emp.Employee}</div></td>
                 <td style="text-align:center;">${emp.LateDays}</td>
                 <td style="text-align:center;">${emp.EarlyExitDays}</td>
@@ -605,6 +500,68 @@ HTML_TEMPLATE = """
         `).join('');
     }
 
+    let selectedEmployees = new Set();
+    function toggleSelect(cb) {
+        if(cb.checked) selectedEmployees.add(cb.value);
+        else selectedEmployees.delete(cb.value);
+        // Sync check boxes if name appears in multiple lists
+        document.querySelectorAll(`.row-check[value="${cb.value}"]`).forEach(box => box.checked = cb.checked);
+    }
+    
+    function generateEmails() {
+        if(selectedEmployees.size === 0) { alert("Please select at least one employee."); return; }
+        
+        showModal();
+        document.getElementById('modal-title').textContent = `📧 Draft Emails (${selectedEmployees.size})`;
+        const container = document.getElementById('modal-body');
+        container.innerHTML = '';
+        
+        selectedEmployees.forEach(empName => {
+            const empData = dailyData.filter(d => d.Employee === empName && (d.IsLate || d.IsEarlyExit || d.WorkHours < 8));
+            
+            // Generate Table Rows
+            const rows = empData.map(d => `
+                <tr>
+                    <td>${d.Date}</td>
+                    <td style="${d.IsLate ? 'color:orange; font-weight:bold;' : ''}">${d.FirstIn}</td>
+                    <td style="${d.IsEarlyExit ? 'color:red; font-weight:bold;' : ''}">${d.LastOut}</td>
+                    <td>${d.WorkHours}</td>
+                    <td>${d.Note}</td>
+                </tr>
+            `).join('');
+
+            const emailHtml = `
+            <div class="email-container">
+                <div class="email-subject">Subject: Notice of Attendance Irregularity - ${empName}</div>
+                <pre class="email-body">Dear ${empName},
+
+We have noticed some irregularities in your attendance for this month. 
+Our office hours are from **9:30 AM to 5:30 PM**.
+
+Below is a summary of dates where you were flagged for Late Entry, Early Exit without sufficient hours, or under-time:
+
+<table class="email-table"><thead><tr><th>Date</th><th>In</th><th>Out</th><th>Hrs</th><th>Issue</th></tr></thead><tbody>${rows || '<tr><td colspan=5>No specific issues found (General compliance warning).</td></tr>'}</tbody></table>
+Please ensure you adhere to the office schedule moving forward.
+If you have valid reasons for these instances, please report to HR.
+
+Regards,
+Management</pre>
+                <button class="copy-btn" onclick="copyToClip(this)">📋 Copy to Clipboard</button>
+            </div>`;
+            
+            container.insertAdjacentHTML('beforeend', emailHtml);
+        });
+    }
+    
+    function copyToClip(btn) {
+        const text = btn.previousElementSibling.innerText;
+        navigator.clipboard.writeText(text);
+        const original = btn.textContent;
+        btn.textContent = "✅ Copied!";
+        setTimeout(() => btn.textContent = original, 2000);
+    }
+
+    // ... (rest of old JS functions: populateEmployeeSelect, renderCalendar, openModal, etc.) ...
     function populateEmployeeSelect() {
         const select = document.getElementById('emp-select');
         stats.sort((a,b) => a.Employee.localeCompare(b.Employee)).forEach(s => {
@@ -624,8 +581,6 @@ HTML_TEMPLATE = """
         if(!empName) return;
 
         const records = dailyData.filter(d => d.Employee === empName);
-        
-        // Find date range
         let year, month, daysInMonth, firstDay;
         
         if (records.length > 0) {
@@ -656,7 +611,6 @@ HTML_TEMPLATE = """
             const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             const rec = records.find(r => r.Date === dateStr);
             let cls = 'cal-day';
-            
             if(rec) {
                 if(rec.IsCompliant) cls += ' day-compliant';
                 else if(rec.IsLate || rec.IsEarlyExit) cls += ' day-late';
@@ -673,14 +627,10 @@ HTML_TEMPLATE = """
         const title = document.getElementById('modal-title');
         if(type === 'chronic') {
             title.textContent = '🔴 Chronic Late Employees (≥20%)';
-            renderTable(stats.filter(s => s.ChronicLate), 
-                ['Employee', 'LateDays', 'PresentDays'], 
-                ['Employee', 'Late Days', 'Days Present']);
+            renderTable(stats.filter(s => s.ChronicLate), ['Employee', 'LateDays', 'PresentDays'], ['Employee', 'Late Days', 'Days Present']);
         } else if(type === 'under') {
             title.textContent = '🟠 Employees Under 8 Hours Avg';
-            renderTable(stats.filter(s => s.UnderHours), 
-                ['Employee', 'AvgWorkHours', 'PresentDays'], 
-                ['Employee', 'Avg Hours', 'Days Present']);
+            renderTable(stats.filter(s => s.UnderHours), ['Employee', 'AvgWorkHours', 'PresentDays'], ['Employee', 'Avg Hours', 'Days Present']);
         }
     }
 
@@ -707,20 +657,9 @@ HTML_TEMPLATE = """
             let badge = 'badge-green';
             if(r.IsLate || r.IsEarlyExit) badge = 'badge-orange';
             if(!r.IsCompliant && !r.IsLate && !r.IsEarlyExit) badge = 'badge-red';
-            
-            html += `<tr>
-                <td>${r.Date}</td>
-                <td>${r.FirstIn}</td>
-                <td>${r.LastOut}</td>
-                <td><strong>${r.WorkHours}</strong></td>
-                <td><span class="status-badge ${badge}">${r.Note}</span></td>
-            </tr>`;
+            html += `<tr><td>${r.Date}</td><td>${r.FirstIn}</td><td>${r.LastOut}</td><td><strong>${r.WorkHours}</strong></td><td><span class="status-badge ${badge}">${r.Note}</span></td></tr>`;
         });
-        document.getElementById('modal-body').innerHTML = `
-            <table class="detail-table">
-                <thead><tr><th>Date</th><th>Entry</th><th>Exit</th><th>Hours</th><th>Status</th></tr></thead>
-                <tbody>${html}</tbody>
-            </table>`;
+        document.getElementById('modal-body').innerHTML = `<table class="detail-table"><thead><tr><th>Date</th><th>Entry</th><th>Exit</th><th>Hours</th><th>Status</th></tr></thead><tbody>${html}</tbody></table>`;
     }
 
     function showModal() { document.getElementById('modal').style.display = 'flex'; }
@@ -779,7 +718,8 @@ if uploaded_file is not None:
             # 3. INJECT HTML
             final_html = HTML_TEMPLATE.replace("{STATS_JSON}", stats_json).replace("{DAILY_JSON}", daily_json)
             
-            components.html(final_html, height=1000, scrolling=True) # Increased height for taller stacked column
+            # Reduce height to 850px to fix bottom gap
+            components.html(final_html, height=850, scrolling=True) 
             
         else:
             st.error("Processing failed or no data found.")
