@@ -1,13 +1,44 @@
-# ... (Previous imports)
+import streamlit as st
+import pandas as pd
+import json
+import streamlit.components.v1 as components
+from datetime import time
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import os
-import json
 
-# LOAD CONFIG (for credentials)
+# PAGE SETUP
+st.set_page_config(page_title="Attendance - Monthly Overview", page_icon="📅", layout="wide")
+
+# CUSTOM CSS FOR STREAMLIT INTERFACE ONLY
+st.markdown("""
+<style>
+    .main {
+        background-color: #1a1f2e;
+    }
+    .stApp > header {
+        background-color: transparent;
+    }
+    .stFileUploader {
+        padding: 20px;
+        background: rgba(255,255,255,0.05);
+        border-radius: 10px;
+    }
+    h1 {
+        color: white;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# CONSTANTS
+REQUIRED_HOURS = 8.0
+LATE_THRESHOLD = time(9, 30)
+EXIT_THRESHOLD = time(17, 30)
+CHRONIC_LATE_THRESHOLD = 0.20
 CONFIG_FILE = "config.json"
 
+# HELPER FUNCTIONS
 def load_config():
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r") as f:
@@ -31,187 +62,78 @@ def send_email_simple(sender, password, recipient, subject, html_body):
     except Exception as e:
         return False, str(e)
 
-# ... (Previous code: set_page_config, CSS, CONSTANTS, process_attendance_simple) ...
-
-# ... (Previous HTML_TEMPLATE) ...
-
-# MAIN APP LOGIC
-st.markdown("<div class='page-title'>📅 Attendance Report (Interactive)</div>", unsafe_allow_html=True)
-
-uploaded_file = st.file_uploader("Upload Excel Attendance Sheet", type=['xlsx', 'xls', 'csv'])
-
-if uploaded_file is not None:
-    try:
-        file_name = uploaded_file.name.lower()
-        if file_name.endswith('.csv'):
-            df_raw = pd.read_csv(uploaded_file)
-        elif file_name.endswith('.xls'):
-            df_raw = pd.read_excel(uploaded_file, engine='xlrd')
-        elif file_name.endswith('.xlsx'):
-            df_raw = pd.read_excel(uploaded_file, engine='openpyxl')
-            
-        df_daily = process_attendance_simple(df_raw)
+def process_attendance_simple(df):
+    df.columns = df.columns.str.strip()
+    
+    name_col = None
+    datetime_col = None
+    
+    for col in df.columns:
+        col_lower = col.lower()
+        if 'name' in col_lower and 'department' not in col_lower:
+            name_col = col
+        elif 'date/time' in col_lower or 'datetime' in col_lower or ('date' in col_lower and 'time' in col_lower):
+            datetime_col = col
+    
+    if not name_col or not datetime_col:
+        st.error("⚠️ Could not find Name and Date/Time columns")
+        return None
+    
+    df['Timestamp'] = pd.to_datetime(df[datetime_col], dayfirst=True, errors='coerce')
+    df = df.dropna(subset=['Timestamp'])
+    df['Date'] = df['Timestamp'].dt.strftime('%Y-%m-%d')
+    df['Employee'] = df[name_col].astype(str).str.strip()
+    
+    results = []
+    grouped = df.groupby(['Employee', 'Date'])
+    
+    for (emp, date), group in grouped:
+        punches = group['Timestamp'].sort_values()
         
-        if df_daily is not None and not df_daily.empty:
-            
-            # 1. PROCESS STATS IN PYTHON
-            try:
-                # Ensure date parsing works for total days calculation
-                dates = pd.to_datetime(df_daily['Date'])
-                total_days_in_month = dates.dt.day.max()
-            except:
-                total_days_in_month = 30 # Fallback
-            
-            employee_stats = df_daily.groupby('Employee').agg({
-                'Date': 'count',
-                'WorkHours': 'mean',
-                'IsLate': 'sum',
-                'IsEarlyExit': 'sum',
-                'IsCompliant': 'sum'
-            }).reset_index()
-            
-            employee_stats.columns = ['Employee', 'PresentDays', 'AvgWorkHours', 'LateDays', 'EarlyExitDays', 'CompliantDays']
-            employee_stats['AttendancePct'] = (employee_stats['PresentDays'] / total_days_in_month * 100).round(1)
-            employee_stats['ChronicLate'] = (employee_stats['LateDays'] / employee_stats['PresentDays']) >= CHRONIC_LATE_THRESHOLD
-            employee_stats['UnderHours'] = employee_stats['AvgWorkHours'] < REQUIRED_HOURS
-            employee_stats['AvgDeviation'] = (employee_stats['AvgWorkHours'] - REQUIRED_HOURS).round(1)
-            employee_stats['TotalRiskDays'] = employee_stats['LateDays'] + employee_stats['EarlyExitDays']
-            
-            # 2. CONVERT TO JSON FOR JS
-            stats_json = employee_stats.to_json(orient="records")
-            daily_json = df_daily.to_json(orient="records")
-            
-            # 3. INJECT HTML
-            final_html = HTML_TEMPLATE.replace("{STATS_JSON}", stats_json).replace("{DAILY_JSON}", daily_json)
-            
-            # Reduce height to 850px to fix bottom gap
-            components.html(final_html, height=850, scrolling=True) 
-            
-            # ---------------------------------------------------------
-            # NEW: EMAIL ACTION CENTER (Native Streamlit)
-            # ---------------------------------------------------------
-            st.divider()
-            with st.expander("📧 **Admin Actions: Send Warning Emails**", expanded=True):
-                st.write("Select employees below to send automated warning emails regarding their attendance irregularities.")
-                
-                # Filter useful candidates (Late or Under Hours)
-                risk_candidates = employee_stats[
-                    (employee_stats['LateDays'] > 0) | 
-                    (employee_stats['UnderHours']) | 
-                    (employee_stats['TotalRiskDays'] > 0)
-                ].sort_values('TotalRiskDays', ascending=False)
-                
-                if not risk_candidates.empty:
-                    # Multiselect for employees
-                    selected_emps = st.multiselect(
-                        "Select Employees to Email:", 
-                        risk_candidates['Employee'].tolist(),
-                        format_func=lambda x: f"{x} (Late: {risk_candidates[risk_candidates['Employee']==x]['LateDays'].values[0]}, Risk: {risk_candidates[risk_candidates['Employee']==x]['TotalRiskDays'].values[0]})"
-                    )
-                    
-                    # Credentials Input (Pre-fill if config exists)
-                    config = load_config()
-                    col1, col2 = st.columns(2)
-                    sender_email = col1.text_input("Sender Email", value=config.get("sender_email", ""))
-                    sender_password = col2.text_input("Sender App Password", value=config.get("sender_password", ""), type="password")
-                    
-                    if st.button("🚀 Send Warning Emails to Selected"):
-                        if not sender_email or not sender_password:
-                            st.error("Please provide Sender Email and Password.")
-                        elif not selected_emps:
-                            st.warning("Please select at least one employee.")
-                        else:
-                            progress_bar = st.progress(0)
-                            status_area = st.empty()
-                            
-                            success_count = 0
-                            
-                            for i, emp_name in enumerate(selected_emps):
-                                status_area.text(f"Processing {emp_name}...")
-                                # Get irregularities
-                                emp_data = df_daily[
-                                    (df_daily['Employee'] == emp_name) & 
-                                    (
-                                        (df_daily['IsLate']) | 
-                                        (df_daily['IsEarlyExit']) | 
-                                        (df_daily['WorkHours'] < REQUIRED_HOURS)
-                                    )
-                                ]
-                                
-                                if emp_data.empty:
-                                    st.warning(f"Skipping {emp_name}: No irregularities found to report.")
-                                    continue
-                                
-                                # Generate HTML Table
-                                table_html = """<table style="border-collapse: collapse; width: 100%; border: 1px solid #ddd;">
-                                    <tr style="background-color: #f2f2f2;">
-                                        <th style="border: 1px solid #ddd; padding: 8px;">Date</th>
-                                        <th style="border: 1px solid #ddd; padding: 8px;">In</th>
-                                        <th style="border: 1px solid #ddd; padding: 8px;">Out</th>
-                                        <th style="border: 1px solid #ddd; padding: 8px;">Hrs</th>
-                                        <th style="border: 1px solid #ddd; padding: 8px;">Issue</th>
-                                    </tr>"""
-                                for _, row in emp_data.iterrows():
-                                    color = "color: orange;" if row['IsLate'] else ("color: red;" if row['IsEarlyExit'] else "")
-                                    table_html += f"""<tr>
-                                        <td style="border: 1px solid #ddd; padding: 8px;">{row['Date']}</td>
-                                        <td style="border: 1px solid #ddd; padding: 8px; {color if row['IsLate'] else ''}">{row['FirstIn']}</td>
-                                        <td style="border: 1px solid #ddd; padding: 8px; {color if row['IsEarlyExit'] else ''}">{row['LastOut']}</td>
-                                        <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">{row['WorkHours']}</td>
-                                        <td style="border: 1px solid #ddd; padding: 8px;">{row['Note']}</td>
-                                    </tr>"""
-                                table_html += "</table>"
-                                
-                                # Email Body
-                                body = f"""
-                                <p>Dear {emp_name},</p>
-                                <p>We have noticed some irregularities in your attendance for this month. 
-                                Our office hours are from <b>9:30 AM to 5:30 PM</b>.</p>
-                                <p>Below is a summary of dates where you were flagged for Late Entry, Early Exit without sufficient hours, or under-time:</p>
-                                {table_html}
-                                <p>Please ensure you adhere to the office schedule moving forward.<br>
-                                If you have valid reasons for these instances, please report to HR.</p>
-                                <br>
-                                <p>Regards,<br>Management</p>
-                                """
-                                
-                                # Send (In a real app, recipient would be emp_name's email. Here we might need a mapping or use a test email)
-                                # For now, taking recipient from config or asking user? 
-                                # User said "allow me to send". 
-                                # I should probably add a mapping or default to the config recipient for testing.
-                                # IMPORTANT: I don't have employee emails. 
-                                # I will use the "recipients" from config as a fallback/test mode, or assume I can't send to real people without a mapping file.
-                                # I'll send to the configured 'notification' email for now as a "BCC / Report" style or ask user.
-                                # Actually, user said "allow me to send... it has my login credentials".
-                                # I will assume for now we send to the test recipient in config (Ashish self) for demo purposes, 
-                                # OR add a caveat.
-                                
-                                # Let's try to send to the email in config['recipients'] but with the subject "Warning for {emp_name}"
-                                target_email = config.get("recipients", "")
-                                if not target_email:
-                                    st.error("No recipient configured in config.json.")
-                                    break
-                                    
-                                ok, msg = send_email_simple(sender_email, sender_password, target_email, f"Notice of Attendance Irregularity - {emp_name}", body)
-                                if ok:
-                                    success_count += 1
-                                else:
-                                    st.error(f"Failed to send to {emp_name}: {msg}")
-                                
-                                progress_bar.progress((i + 1) / len(selected_emps))
-                            
-                            if success_count > 0:
-                                st.success(f"✅ Successfully sent {success_count} emails (delivered to configured test recipient: {config.get('recipients')}).")
-                                st.caption("Note: Since employee email addresses are not in the uploaded file, all emails were sent to your configured recipient address for verification.")
-                else:
-                    st.info("No candidates found with attendance risks.")
-            
+        if len(punches) < 1:
+            continue
+        
+        first_in = punches.iloc[0]
+        last_out = punches.iloc[-1]
+        work_hours = (last_out - first_in).total_seconds() / 3600
+        
+        # LOGIC UPDATES
+        is_late = first_in.time() > LATE_THRESHOLD
+        
+        if work_hours >= REQUIRED_HOURS:
+            is_early_exit = False
         else:
-            st.error("Processing failed or no data found.")
-            
-    except Exception as e:
-        st.error(f"Error: {e}")
+            is_early_exit = last_out.time() < EXIT_THRESHOLD
+        
+        is_compliant = work_hours >= REQUIRED_HOURS and not is_late
+        
+        if is_compliant:
+            note = "Compliant"
+        elif is_late and is_early_exit:
+            note = "Late Entry & Early Exit"
+        elif is_late:
+            note = "Late Entry"
+        elif is_early_exit:
+            note = "Early Exit"
+        else:
+            note = "Compliant"
 
+        results.append({
+            'Employee': emp,
+            'Date': date,
+            'FirstIn': first_in.strftime('%H:%M:%S'),
+            'LastOut': last_out.strftime('%H:%M:%S'),
+            'WorkHours': round(work_hours, 1),
+            'IsLate': bool(is_late),
+            'IsEarlyExit': bool(is_early_exit),
+            'IsCompliant': bool(is_compliant),
+            'Note': note
+        })
+    
+    return pd.DataFrame(results)
+
+# PURE HTML/JS DASHBOARD TEMPLATE
+HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
@@ -295,7 +217,7 @@ if uploaded_file is not None:
         grid-template-columns: repeat(4, 1fr);
         gap: 15px;
     }
-    /* ... (metrics styles same as before) ... */
+    
     .metric-card {
         border-radius: 6px;
         padding: 15px;
@@ -349,7 +271,6 @@ if uploaded_file is not None:
         justify-content: flex-start; /* Stack from top */
     }
 
-    /* ... (rest of CSS same until modal body) ... */
     .section-header {
         background: #34495e;
         padding: 12px 15px;
@@ -365,7 +286,6 @@ if uploaded_file is not None:
     .emp-name { font-weight: 500; color: #ecf0f1; cursor: pointer; transition: color 0.2s; text-decoration: none; display: flex; align-items: center; gap: 8px; }
     .emp-name:hover { color: #3498db; text-decoration: underline; }
     
-    /* ... (Calendar styles same) ... */
     .calendar-body { padding: 15px; }
     .cal-controls { margin-bottom: 15px; }
     .cal-select { width: 100%; background: #1a1f2e; color: white; border: 1px solid var(--border-color); padding: 8px; border-radius: 4px; outline: none; font-family: inherit; }
@@ -785,8 +705,12 @@ if uploaded_file is not None:
         if df_daily is not None and not df_daily.empty:
             
             # 1. PROCESS STATS IN PYTHON
-            dates = pd.to_datetime(df_daily['Date'])
-            total_days_in_month = dates.dt.day.max()
+            try:
+                # Ensure date parsing works for total days calculation
+                dates = pd.to_datetime(df_daily['Date'])
+                total_days_in_month = dates.dt.day.max()
+            except:
+                total_days_in_month = 30 # Fallback
             
             employee_stats = df_daily.groupby('Employee').agg({
                 'Date': 'count',
@@ -812,6 +736,125 @@ if uploaded_file is not None:
             
             # Reduce height to 850px to fix bottom gap
             components.html(final_html, height=850, scrolling=True) 
+            
+            # ---------------------------------------------------------
+            # NEW: EMAIL ACTION CENTER (Native Streamlit)
+            # ---------------------------------------------------------
+            st.divider()
+            with st.expander("📧 **Admin Actions: Send Warning Emails**", expanded=True):
+                st.write("Select employees below to send automated warning emails regarding their attendance irregularities.")
+                
+                # Filter useful candidates (Late or Under Hours)
+                risk_candidates = employee_stats[
+                    (employee_stats['LateDays'] > 0) | 
+                    (employee_stats['UnderHours']) | 
+                    (employee_stats['TotalRiskDays'] > 0)
+                ].sort_values('TotalRiskDays', ascending=False)
+                
+                if not risk_candidates.empty:
+                    # Multiselect for employees
+                    selected_emps = st.multiselect(
+                        "Select Employees to Email:", 
+                        risk_candidates['Employee'].tolist(),
+                        format_func=lambda x: f"{x} (Late: {risk_candidates[risk_candidates['Employee']==x]['LateDays'].values[0]}, Risk: {risk_candidates[risk_candidates['Employee']==x]['TotalRiskDays'].values[0]})"
+                    )
+                    
+                    # Credentials Input (Pre-fill if config exists)
+                    config = load_config()
+                    col1, col2 = st.columns(2)
+                    sender_email = col1.text_input("Sender Email", value=config.get("sender_email", ""))
+                    sender_password = col2.text_input("Sender App Password", value=config.get("sender_password", ""), type="password")
+                    
+                    if st.button("🚀 Send Warning Emails to Selected"):
+                        if not sender_email or not sender_password:
+                            st.error("Please provide Sender Email and Password.")
+                        elif not selected_emps:
+                            st.warning("Please select at least one employee.")
+                        else:
+                            progress_bar = st.progress(0)
+                            status_area = st.empty()
+                            
+                            success_count = 0
+                            
+                            for i, emp_name in enumerate(selected_emps):
+                                status_area.text(f"Processing {emp_name}...")
+                                # Get irregularities
+                                emp_data = df_daily[
+                                    (df_daily['Employee'] == emp_name) & 
+                                    (
+                                        (df_daily['IsLate']) | 
+                                        (df_daily['IsEarlyExit']) | 
+                                        (df_daily['WorkHours'] < REQUIRED_HOURS)
+                                    )
+                                ]
+                                
+                                if emp_data.empty:
+                                    st.warning(f"Skipping {emp_name}: No irregularities found to report.")
+                                    continue
+                                
+                                # Generate HTML Table
+                                table_html = """<table style="border-collapse: collapse; width: 100%; border: 1px solid #ddd;">
+                                    <tr style="background-color: #f2f2f2;">
+                                        <th style="border: 1px solid #ddd; padding: 8px;">Date</th>
+                                        <th style="border: 1px solid #ddd; padding: 8px;">In</th>
+                                        <th style="border: 1px solid #ddd; padding: 8px;">Out</th>
+                                        <th style="border: 1px solid #ddd; padding: 8px;">Hrs</th>
+                                        <th style="border: 1px solid #ddd; padding: 8px;">Issue</th>
+                                    </tr>"""
+                                for _, row in emp_data.iterrows():
+                                    color = "color: orange;" if row['IsLate'] else ("color: red;" if row['IsEarlyExit'] else "")
+                                    table_html += f"""<tr>
+                                        <td style="border: 1px solid #ddd; padding: 8px;">{row['Date']}</td>
+                                        <td style="border: 1px solid #ddd; padding: 8px; {color if row['IsLate'] else ''}">{row['FirstIn']}</td>
+                                        <td style="border: 1px solid #ddd; padding: 8px; {color if row['IsEarlyExit'] else ''}">{row['LastOut']}</td>
+                                        <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">{row['WorkHours']}</td>
+                                        <td style="border: 1px solid #ddd; padding: 8px;">{row['Note']}</td>
+                                    </tr>"""
+                                table_html += "</table>"
+                                
+                                # Email Body
+                                body = f"""
+                                <p>Dear {emp_name},</p>
+                                <p>We have noticed some irregularities in your attendance for this month. 
+                                Our office hours are from <b>9:30 AM to 5:30 PM</b>.</p>
+                                <p>Below is a summary of dates where you were flagged for Late Entry, Early Exit without sufficient hours, or under-time:</p>
+                                {table_html}
+                                <p>Please ensure you adhere to the office schedule moving forward.<br>
+                                If you have valid reasons for these instances, please report to HR.</p>
+                                <br>
+                                <p>Regards,<br>Management</p>
+                                """
+                                
+                                # Send (In a real app, recipient would be emp_name's email. Here we might need a mapping or use a test email)
+                                # For now, taking recipient from config or asking user? 
+                                # User said "allow me to send". 
+                                # I should probably add a mapping or default to the config recipient for testing.
+                                # IMPORTANT: I don't have employee emails. 
+                                # I will use the "recipients" from config as a fallback/test mode, or assume I can't send to real people without a mapping file.
+                                # I'll send to the configured 'notification' email for now as a "BCC / Report" style or ask user.
+                                # Actually, user said "allow me to send... it has my login credentials".
+                                # I will assume for now we send to the test recipient in config (Ashish self) for demo purposes, 
+                                # OR add a caveat.
+                                
+                                # Let's try to send to the email in config['recipients'] but with the subject "Warning for {emp_name}"
+                                target_email = config.get("recipients", "")
+                                if not target_email:
+                                    st.error("No recipient configured in config.json.")
+                                    break
+                                    
+                                ok, msg = send_email_simple(sender_email, sender_password, target_email, f"Notice of Attendance Irregularity - {emp_name}", body)
+                                if ok:
+                                    success_count += 1
+                                else:
+                                    st.error(f"Failed to send to {emp_name}: {msg}")
+                                
+                                progress_bar.progress((i + 1) / len(selected_emps))
+                            
+                            if success_count > 0:
+                                st.success(f"✅ Successfully sent {success_count} emails (delivered to configured test recipient: {config.get('recipients')}).")
+                                st.caption("Note: Since employee email addresses are not in the uploaded file, all emails were sent to your configured recipient address for verification.")
+                else:
+                    st.info("No candidates found with attendance risks.")
             
         else:
             st.error("Processing failed or no data found.")
