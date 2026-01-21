@@ -341,9 +341,6 @@ HTML_TEMPLATE = """
     <!-- HEADER -->
     <div class="header">
         <h1>Monthly Management Snapshot</h1>
-        <button class="action-btn" onclick="generateEmails()">
-            📩 Generate Warning Drafts
-        </button>
     </div>
 
     <!-- METRICS -->
@@ -827,7 +824,9 @@ Management"""
                     sender_email = col_creds1.text_input("Sender Email", value=config.get("sender_email", ""))
                     sender_password = col_creds2.text_input("Sender App Password", value=config.get("sender_password", ""), type="password")
                     
-                    col_act1, col_act2 = st.columns([1, 1])
+                    # Store generated drafts in session state to persist between reruns
+                    if "generated_drafts" not in st.session_state:
+                        st.session_state.generated_drafts = None
                     
                     # Helper to generate content
                     def generate_content_for_emp(emp_name):
@@ -867,65 +866,65 @@ Management"""
                         # Fill Templates
                         subj = email_subject_tmpl.replace("{name}", emp_name)
                         body = email_body_tmpl.replace("{name}", emp_name).replace("{table}", table_html)
-                        # Convert newlines to breaks if it looks like plain text, but user might paste HTML.
-                        # Simple heuristic: if no <p> or <br> tags, wrap lines.
+                        
+                        # Convert newlines to breaks if it looks like plain text
                         if "<p>" not in body and "<br>" not in body:
                             body = body.replace("\n", "<br>")
                             
                         return subj, body
 
-                    # PREVIEW BUTTON
-                    if col_act1.button(f"👁️ Preview Email for {selected_emps[0]}"):
-                        first_emp = selected_emps[0]
-                        subj, body = generate_content_for_emp(first_emp)
-                        st.toast(f"Generating preview for {first_emp}...", icon="👁️")
-                        st.markdown(f"**Subject:** {subj}")
-                        st.markdown("**Body Preview:**")
-                        st.components.v1.html(body, height=400, scrolling=True)
+                    # GENERATE DRAFTS BUTTON
+                    if st.button("📝 Generate Drafts for Review"):
+                        drafts = []
+                        for i, row in edited_df.iterrows():
+                            emp = row['Employee']
+                            subj, body = generate_content_for_emp(emp)
+                            drafts.append({"Employee": emp, "Subject": subj, "Body": body, "Email": row['Email Address']})
+                        st.session_state.generated_drafts = drafts
+                        st.rerun()
 
-                    # SEND BUTTON
-                    if col_act2.button(f"🚀 Send to {len(edited_df)} Recipients"):
-                        if not sender_email or not sender_password:
-                            st.error("Missing Sender Credentials.")
-                        else:
-                            # Validate Emails
-                            valid_map = True
-                            for index, row in edited_df.iterrows():
-                                if not row['Email Address'] or "@" not in row['Email Address']:
-                                    st.error(f"Missing or invalid email for {row['Employee']}")
-                                    valid_map = False
-                            
-                            if valid_map:
+                    # DISPLAY DRAFTS IF GENERATED
+                    if st.session_state.get("generated_drafts"):
+                        st.divider()
+                        st.caption("✅ Drafts generated. Please review contents below before sending.")
+                        
+                        drafts = st.session_state.generated_drafts
+                        
+                        for d in drafts:
+                            with st.expander(f"Draft for {d['Employee']} (To: {d['Email']})"):
+                                st.markdown(f"**Subject:** {d['Subject']}")
+                                st.components.v1.html(d['Body'], height=300, scrolling=True)
+                        
+                        st.divider()
+                        
+                        # SEND BUTTON
+                        if st.button(f"🚀 Confirm & Send {len(drafts)} Emails"):
+                            if not sender_email or not sender_password:
+                                st.error("Missing Sender Credentials.")
+                            else:
                                 progress_bar = st.progress(0)
                                 status_area = st.empty()
                                 success_count = 0
                                 fail_count = 0
                                 
-                                for i, row in edited_df.iterrows():
-                                    emp_name = row['Employee']
-                                    target_email = row['Email Address'] # Use the edited email!
-                                    
-                                    status_area.text(f"Sending to {emp_name} ({target_email})...")
-                                    
-                                    subj, body = generate_content_for_emp(emp_name)
-                                    
-                                    ok, msg = send_email_simple(sender_email, sender_password, target_email, subj, body)
-                                    
+                                for i, d in enumerate(drafts):
+                                    status_area.text(f"Sending to {d['Employee']}...")
+                                    ok, msg = send_email_simple(sender_email, sender_password, d['Email'], d['Subject'], d['Body'])
                                     if ok:
                                         success_count += 1
                                     else:
                                         fail_count += 1
-                                        st.error(f"Failed to send to {emp_name}: {msg}")
-                                    
-                                    progress_bar.progress((i + 1) / len(edited_df))
+                                        st.error(f"Failed to send to {d['Employee']}: {msg}")
+                                    progress_bar.progress((i + 1) / len(drafts))
                                 
                                 if success_count > 0:
-                                    st.success(f"✅ Emails Sent: {success_count}")
+                                    st.success(f"✅ Successfully Sent: {success_count}")
+                                    # Clear drafts after success
+                                    del st.session_state.generated_drafts
                                 if fail_count > 0:
                                     st.warning(f"❌ Failed: {fail_count}")
-            
-        else:
-            st.error("Processing failed or no data found.")
-            
+
+                else:
+                    st.info("No candidates found with attendance risks.")            
     except Exception as e:
         st.error(f"Error: {e}")
