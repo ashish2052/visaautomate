@@ -30,7 +30,7 @@ st.markdown("""
 # CONSTANTS
 REQUIRED_HOURS = 8.0
 LATE_THRESHOLD = time(9, 30)
-EXIT_THRESHOLD = time(18, 0)
+EXIT_THRESHOLD = time(17, 30)
 CHRONIC_LATE_THRESHOLD = 0.20
 
 # DATA PROCESSING FUNCTION
@@ -72,8 +72,13 @@ def process_attendance_simple(df):
         # LOGIC UPDATES
         is_late = first_in.time() > LATE_THRESHOLD
         
-        # Strict Early Exit: Only if they left before 18:00
-        is_early_exit = last_out.time() < EXIT_THRESHOLD
+        # Early Exit Logic:
+        # 1. If worked >= 8 hours, it's NOT early exit (even if left before 5:30, e.g. 8am-4:30pm = 8.5hrs)
+        # 2. If < 8 hours, only flag if left before 5:30 PM
+        if work_hours >= REQUIRED_HOURS:
+            is_early_exit = False
+        else:
+            is_early_exit = last_out.time() < EXIT_THRESHOLD
         
         # Compliant: Must work >=8 hours AND not be late
         is_compliant = work_hours >= REQUIRED_HOURS and not is_late
@@ -87,18 +92,18 @@ def process_attendance_simple(df):
         elif is_early_exit:
             note = "Early Exit"
         else:
-            note = "Compliant" # Case: On time, stayed late, but < 8hrs (unlikely but possible if long break logic existed, basically irrelevant here) -> actually if < 8 hours but not early exit? 
-            # If came at 9:00, left at 18:00 -> 9 hours. Compliant.
-            # If came at 10:30 (Late), left at 18:30 -> 8 hours. IsLate=True. Not Compliant. Note="Late Entry".
+            note = "Compliant" # Case: On time, stayed late, but < 8hrs? Or came late, stayed late (not early exit), hence treated as effectively handled by IsLate or WorkHours.
+            # If Late Entry is False, Early Exit is False.
+            # Could be: Came 10:00 (Late), Left 18:00 (Not Early). Hours 8.0. -> Compliant?
+            # is_late = True. is_compliant = False. note = "Late Entry". (Correct)
             
-            # What if came 9:00, left 17:00? Early Exit = True.
+            # Came 9:00, Left 17:45. Hours 8.75. 
+            # is_late = False. is_early = False. is_compliant = True. note = "Compliant". (Correct)
             
-            # Simple fallback
-            if work_hours < REQUIRED_HOURS and not is_late and not is_early_exit:
-                 # Came on time, left after 6, but somehow < 8 hours? (Maybe math error or same punch)
-                 pass
+            # Came 9:00, Left 16:00. Hours 7.0.
+            # is_late = False. is_early = True. is_compliant = False. note = "Early Exit". (Correct)
+            pass
 
-        
         results.append({
             'Employee': emp,
             'Date': date,
