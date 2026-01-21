@@ -292,34 +292,38 @@ if uploaded_file is not None:
                 
                 # Create HTML card that looks identical to card 1 & 2
                 st.markdown(f"""
-                <div onclick="document.getElementById('chronic_btn_hidden').click()" style='padding: 20px; border-radius: 10px; text-align: center; color: white; background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-height: 120px; cursor: pointer; transition: transform 0.2s;' onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 12px rgba(0,0,0,0.4)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.3)';">
+                <div onclick="
+                    const buttons = window.parent.document.querySelectorAll('button');
+                    buttons.forEach(btn => {{
+                        if (btn.innerText === 'CHRONIC_ACTION') {{
+                            btn.click();
+                        }}
+                    }});
+                " style='padding: 20px; border-radius: 10px; text-align: center; color: white; background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-height: 120px; cursor: pointer; transition: transform 0.2s;' onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 12px rgba(0,0,0,0.4)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.3)';">
                     <div style='font-size: 13px; opacity: 0.95; text-transform: uppercase; letter-spacing: 0.5px;'>CHRONIC LATE</div>
                     <div style='font-size: 42px; font-weight: bold; margin: 10px 0;'>{int(chronic_late_pct)}%</div>
                     <div style='font-size: 10px; opacity: 0.7; margin-top: 5px;'>👆 Click for details</div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Hidden button for Streamlit callback
-                if st.button("chronic", key='chronic_late_btn', type="secondary", help="Hidden", disabled=False, use_container_width=False):
+                # Hidden button (using opacity/position instead of display:none for reliability)
+                if st.button("CHRONIC_ACTION", key='chronic_late_btn'):
                     show_chronic_late_modal(employee_stats)
                 
-                # Hide the button with CSS
+                # Hide the button robustly
                 st.markdown("""
-                <style>
-                button[kind="secondary"][key="chronic_late_btn"] {
-                    display: none !important;
-                }
-                </style>
                 <script>
-                const chronicBtn = document.getElementById('chronic_btn_hidden');
-                if (!chronicBtn) {
-                    const buttons = Array.from(document.querySelectorAll('button'));
-                    const targetBtn = buttons.find(btn => btn.innerText === 'chronic');
-                    if (targetBtn) {
-                        targetBtn.id = 'chronic_btn_hidden';
-                        targetBtn.style.display = 'none';
-                    }
-                }
+                    const buttons = window.parent.document.querySelectorAll('button');
+                    buttons.forEach(btn => {
+                        if (btn.innerText === 'CHRONIC_ACTION') {
+                            btn.style.opacity = '0';
+                            btn.style.position = 'absolute';
+                            btn.style.zIndex = '-1';
+                            btn.style.height = '0';
+                            btn.style.width = '0';
+                            btn.style.overflow = 'hidden';
+                        }
+                    });
                 </script>
                 """, unsafe_allow_html=True)
             
@@ -328,34 +332,38 @@ if uploaded_file is not None:
                 
                 # Create HTML card that looks identical to card 1 & 2
                 st.markdown(f"""
-                <div onclick="document.getElementById('under_btn_hidden').click()" style='padding: 20px; border-radius: 10px; text-align: center; color: white; background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-height: 120px; cursor: pointer; transition: transform 0.2s;' onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 12px rgba(0,0,0,0.4)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.3)';">
+                <div onclick="
+                    const buttons = window.parent.document.querySelectorAll('button');
+                    buttons.forEach(btn => {{
+                        if (btn.innerText === 'UNDER_ACTION') {{
+                            btn.click();
+                        }}
+                    }});
+                " style='padding: 20px; border-radius: 10px; text-align: center; color: white; background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-height: 120px; cursor: pointer; transition: transform 0.2s;' onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 12px rgba(0,0,0,0.4)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.3)';">
                     <div style='font-size: 13px; opacity: 0.95; text-transform: uppercase; letter-spacing: 0.5px;'>UNDER 8HRS</div>
                     <div style='font-size: 42px; font-weight: bold; margin: 10px 0;'>{int(under_hours_pct)}%</div>
                     <div style='font-size: 10px; opacity: 0.7; margin-top: 5px;'>👆 Click for details</div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Hidden button for Streamlit callback
-                if st.button("under", key='under_hours_btn', type="secondary", help="Hidden", disabled=False, use_container_width=False):
+                # Hidden button 
+                if st.button("UNDER_ACTION", key='under_hours_btn'):
                     show_under_hours_modal(employee_stats)
                 
-                # Hide the button with CSS
+                # Hide the button robustly
                 st.markdown("""
-                <style>
-                button[kind="secondary"][key="under_hours_btn"] {
-                    display: none !important;
-                }
-                </style>
                 <script>
-                const underBtn = document.getElementById('under_btn_hidden');
-                if (!underBtn) {
-                    const buttons = Array.from(document.querySelectorAll('button'));
-                    const targetBtn = buttons.find(btn => btn.innerText === 'under');
-                    if (targetBtn) {
-                        targetBtn.id = 'under_btn_hidden';
-                        targetBtn.style.display = 'none';
-                    }
-                }
+                    const buttons = window.parent.document.querySelectorAll('button');
+                    buttons.forEach(btn => {
+                        if (btn.innerText === 'UNDER_ACTION') {
+                            btn.style.opacity = '0';
+                            btn.style.position = 'absolute';
+                            btn.style.zIndex = '-1';
+                            btn.style.height = '0';
+                            btn.style.width = '0';
+                            btn.style.overflow = 'hidden';
+                        }
+                    });
                 </script>
                 """, unsafe_allow_html=True)
             
