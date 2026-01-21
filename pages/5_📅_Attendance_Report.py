@@ -770,7 +770,17 @@ if uploaded_file is not None:
             
         df_daily = process_attendance_simple(df_raw)
         
+        # EXPORT BUTTON (Accounts)
         if df_daily is not None and not df_daily.empty:
+            excel_data = generate_excel_report(df_daily)
+            st.sidebar.markdown("### 📥 Reports")
+            st.sidebar.download_button(
+                label="Download Accounts Excel",
+                data=excel_data,
+                file_name="Attendance_Accounts_Format.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                icon="📊"
+            )
             
             # 1. PROCESS STATS IN PYTHON
             try:
