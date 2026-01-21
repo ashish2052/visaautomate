@@ -221,82 +221,88 @@ def process_attendance_data(df):
     
     # Find relevant columns
     name_col = None
+    datetime_col = None
     date_col = None
     time_col = None
-    punch_col = None
+    status_col = None
     
     for col in df.columns:
         col_lower = col.lower()
-        if 'name' in col_lower or 'employee' in col_lower:
+        if 'name' in col_lower and not 'department' in col_lower:
             name_col = col
-        elif 'date' in col_lower:
+        elif 'date/time' in col_lower or 'datetime' in col_lower:
+            datetime_col = col  # Combined Date/Time column
+        elif 'date' in col_lower and 'time' not in col_lower:
             date_col = col
-        elif 'time' in col_lower and 'punch' not in col_lower:
+        elif 'time' in col_lower and 'date' not in col_lower:
             time_col = col
-        elif 'punch' in col_lower or 'type' in col_lower:
-            punch_col = col
+        elif 'status' in col_lower or 'punch' in col_lower or 'type' in col_lower:
+            status_col = col
     
-    if not all([name_col, date_col, time_col]):
-        st.error("⚠️ Required columns not found. Please ensure your Excel has: Employee Name, Date, Time columns")
+    # Check which format we have
+    if not name_col:
+        st.error("⚠️ Employee Name column not found")
         return None
     
-    # Rename for consistency
-    df = df.rename(columns={
-        name_col: 'Employee',
-        date_col: 'Date',
-        time_col: 'Time',
-    })
-    
-    if punch_col:
-        df = df.rename(columns={punch_col: 'PunchType'})
-    
-    # Convert Date column
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-    
-    # Parse time
-    df['Time'] = df['Time'].apply(parse_time)
+    # Handle combined Date/Time column OR separate Date and Time columns
+    if datetime_col:
+        # Parse combined Date/Time column
+        df['DateTime'] = pd.to_datetime(df[datetime_col], errors='coerce')
+        df['Date'] = df['DateTime'].dt.date
+        df['Time'] = df['DateTime'].dt.time
+        df['Employee'] = df[name_col]
+    elif date_col and time_col:
+        # Separate columns
+        df['Date'] = pd.to_datetime(df[date_col], errors='coerce').dt.date
+        df['Time'] = df[time_col].apply(parse_time)
+        df['Employee'] = df[name_col]
+    else:
+        st.error("⚠️ Date/Time columns not found. Please ensure your file has 'Date/Time' or separate 'Date' and 'Time' columns")
+        return None
     
     # Remove invalid rows
     df = df.dropna(subset=['Employee', 'Date', 'Time'])
     
-    # Sort by employee, date, and time
+    # Sort by employee, date, and time (CRITICAL for auto-detection)
     df = df.sort_values(['Employee', 'Date', 'Time'])
     
     # Calculate daily metrics
     daily_metrics = []
     
     for (emp, date), group in df.groupby(['Employee', 'Date']):
+        # Get all punches for this employee on this day, sorted by time
         times = sorted(group['Time'].tolist())
         
         if len(times) < 2:
-            continue  # Skip incomplete days
+            continue  # Skip incomplete days (need at least IN and OUT)
+        
+        # AUTO-DETECT In/Out sequence (IGNORE Status column)
+        # Pattern: 1st punch = IN, 2nd = OUT, 3rd = IN, 4th = OUT, etc.
+        check_ins = [times[i] for i in range(len(times)) if i % 2 == 0]  # Even indices = IN
+        check_outs = [times[i] for i in range(len(times)) if i % 2 == 1]  # Odd indices = OUT
         
         # First Check-In and Last Check-Out
-        first_in = times[0]
-        last_out = times[-1]
+        first_in = times[0]  # First punch is always IN
+        last_out = times[-1] if len(times) % 2 == 0 else times[-2]  # Last OUT (handle odd number of punches)
+        
+        # If odd number of punches, employee forgot to punch out - use last punch as OUT
+        if len(times) % 2 == 1:
+            last_out = times[-1]
         
         # Total Presence (in minutes)
         total_presence = time_to_minutes(last_out) - time_to_minutes(first_in)
         
-        # Calculate breaks
+        # Calculate breaks (time between OUT and next IN)
         breaks = []
-        for i in range(len(times) - 1):
-            if i % 2 == 1:  # Assuming alternating in/out pattern
-                break_mins = time_to_minutes(times[i+1]) - time_to_minutes(times[i])
-                break_time = times[i]
-                breaks.append({
-                    'duration': break_mins,
-                    'time': break_time
-                })
-        
-        # If we don't have clear in/out pairs, calculate gaps between consecutive times
-        if len(breaks) == 0 and len(times) > 2:
-            for i in range(len(times) - 1):
-                gap = time_to_minutes(times[i+1]) - time_to_minutes(times[i])
-                if gap > 15:  # Only count gaps > 15 mins as breaks
+        for i in range(1, len(times) - 1, 2):  # Start at first OUT (index 1), step by 2
+            if i + 1 < len(times):  # Make sure there's a next IN
+                out_time = times[i]
+                in_time = times[i + 1]
+                break_mins = time_to_minutes(in_time) - time_to_minutes(out_time)
+                if break_mins > 0:  # Only count positive breaks
                     breaks.append({
-                        'duration': gap,
-                        'time': times[i]
+                        'duration': break_mins,
+                        'time': out_time
                     })
         
         total_break = sum(b['duration'] for b in breaks)
@@ -335,12 +341,25 @@ def process_attendance_data(df):
     return pd.DataFrame(daily_metrics)
 
 # FILE UPLOAD
-uploaded_file = st.file_uploader("📤 Upload Excel Attendance Sheet", type=['xlsx', 'xls'])
+uploaded_file = st.file_uploader("📤 Upload Excel Attendance Sheet", type=['xlsx', 'xls', 'csv'])
 
 if uploaded_file is not None:
     try:
-        # Load file
-        df_raw = pd.read_excel(uploaded_file, engine='openpyxl')
+        # Detect file type and load accordingly
+        file_name = uploaded_file.name.lower()
+        
+        if file_name.endswith('.csv'):
+            # Load CSV
+            df_raw = pd.read_csv(uploaded_file)
+        elif file_name.endswith('.xls'):
+            # Load old Excel format (.xls) using xlrd engine
+            df_raw = pd.read_excel(uploaded_file, engine='xlrd')
+        elif file_name.endswith('.xlsx'):
+            # Load new Excel format (.xlsx) using openpyxl engine
+            df_raw = pd.read_excel(uploaded_file, engine='openpyxl')
+        else:
+            st.error("⚠️ Unsupported file format. Please upload .xls, .xlsx, or .csv file")
+            st.stop()
         
         # Process attendance data
         df_metrics = process_attendance_data(df_raw)
