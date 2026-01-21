@@ -526,8 +526,8 @@ HTML_TEMPLATE = """
             </tr>
         `).join('');
 
-        // Risk List
-        const risk = [...stats].sort((a,b) => b.TotalRiskDays - a.TotalRiskDays).slice(0, 5);
+        // Risk List - CHANGED TO TOP 10
+        const risk = [...stats].sort((a,b) => b.TotalRiskDays - a.TotalRiskDays).slice(0, 10);
         document.getElementById('list-risk').innerHTML = risk.map(emp => `
             <tr>
                 <td><div class="emp-name" onclick="openEmpDetail('${emp.Employee}')">⚠️ ${emp.Employee}</div></td>
@@ -557,11 +557,25 @@ HTML_TEMPLATE = """
         if(!empName) return;
 
         const records = dailyData.filter(d => d.Employee === empName);
-        if(records.length === 0) return;
-
-        const dateObj = new Date(records[0].Date);
-        const year = dateObj.getFullYear();
-        const month = dateObj.getMonth();
+        
+        // Find date range from stats to determine month length correctly
+        // Default to current date if no records, but usually we have data
+        let year, month, daysInMonth, firstDay;
+        
+        if (records.length > 0) {
+            const dateObj = new Date(records[0].Date);
+            year = dateObj.getFullYear();
+            month = dateObj.getMonth();
+            firstDay = new Date(year, month, 1).getDay();
+            daysInMonth = new Date(year, month + 1, 0).getDate();
+        } else {
+             // Fallback if employee has 0 records but exists in stats (unlikely but safe)
+            const today = new Date();
+            year = today.getFullYear();
+            month = today.getMonth();
+            firstDay = new Date(year, month, 1).getDay();
+            daysInMonth = new Date(year, month + 1, 0).getDate();
+        }
         
         const empStats = stats.find(s => s.Employee === empName);
         summary.innerHTML = `
@@ -571,23 +585,25 @@ HTML_TEMPLATE = """
             <div class="stat-row"><span>Avg Hours:</span> <b style="color:#3498db">${empStats.AvgWorkHours.toFixed(1)}</b></div>
         `;
 
-        const firstDay = new Date(year, month, 1).getDay();
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-
+        // Render empty cells for offset
         for(let i=0; i<firstDay; i++) container.insertAdjacentHTML('beforeend', '<div class="cal-day day-empty"></div>');
 
+        // Render days
         for(let d=1; d<=daysInMonth; d++) {
             const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             const rec = records.find(r => r.Date === dateStr);
             let cls = 'cal-day';
+            
+            // Logic: If record exists use color, else use neutral styling (same bg as header/base)
             if(rec) {
                 if(rec.IsCompliant) cls += ' day-compliant';
                 else if(rec.IsLate || rec.IsEarlyExit) cls += ' day-late';
                 else cls += ' day-risk';
             } else {
-                cls += ' day-empty';
+                 // No data for this day -> show day number but neutral style
+                 cls += ' day-neutral'; 
             }
-            container.insertAdjacentHTML('beforeend', `<div class="${cls}">${rec ? d : ''}</div>`);
+            container.insertAdjacentHTML('beforeend', `<div class="${cls}" style="${!rec ? 'background: #34495e; color: #7f8c8d;' : ''}">${d}</div>`);
         }
     }
 
