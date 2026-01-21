@@ -8,14 +8,6 @@ import io
 # PAGE SETUP
 st.set_page_config(page_title="Attendance - Monthly Overview", page_icon="📅", layout="wide")
 
-# Initialize session state for popups
-if 'show_popup' not in st.session_state:
-    st.session_state.show_popup = False
-if 'popup_type' not in st.session_state:
-    st.session_state.popup_type = None
-if 'selected_employee' not in st.session_state:
-    st.session_state.selected_employee = None
-
 # CUSTOM CSS
 st.markdown("""
 <style>
@@ -53,56 +45,9 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
     
-    .kpi-card {
-        padding: 20px;
-        border-radius: 10px;
-        text-align: center;
-        color: white;
-        margin: 10px 0;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        min-height: 120px;
-        cursor: pointer;
-        transition: transform 0.2s;
-    }
-    
-    .kpi-card:hover {
-        transform: scale(1.05);
-    }
-    
-    .kpi-green {
-        background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
-    }
-    
-    .kpi-blue {
-        background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-    }
-    
-    .kpi-red {
-        background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-    }
-    
-    .kpi-orange {
-        background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
-    }
-    
-    .kpi-number {
-        font-size: 42px;
-        font-weight: bold;
-        margin: 10px 0;
-    }
-    
-    .kpi-label {
-        font-size: 13px;
-        opacity: 0.95;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .kpi-hint {
-        font-size: 10px;
-        opacity: 0.7;
-        margin-top: 5px;
-        font-style: italic;
+    /* Hide Streamlit default dialog styling */
+    [data-testid="stDialog"] {
+        background: rgba(0,0,0,0.85) !important;
     }
     
     .calendar-grid {
@@ -140,11 +85,19 @@ st.markdown("""
         color: #7f8c8d;
     }
     
-    .popup-overlay {
-        background: rgba(0,0,0,0.8);
-        padding: 20px;
-        border-radius: 10px;
-        margin: 20px 0;
+   .employee-button {
+        background: transparent;
+        border: 1px solid #3498db;
+        color: #3498db;
+        padding: 8px 16px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .employee-button:hover {
+        background: #3498db;
+        color: white;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -199,7 +152,6 @@ def process_attendance_simple(df):
         is_early_exit = work_hours < REQUIRED_HOURS
         is_compliant = work_hours >= REQUIRED_HOURS and not is_late
         
-        # Create note
         if is_compliant:
             note = "Compliant"
         elif is_late and is_early_exit:
@@ -224,6 +176,51 @@ def process_attendance_simple(df):
         })
     
     return pd.DataFrame(results)
+
+# MODAL DIALOG DEFINITIONS
+@st.dialog("🔴 Chronic Late Employees (Late ≥20% of days)", width="large")
+def show_chronic_late_modal(employee_stats):
+    chronic_late_emps = employee_stats[employee_stats['ChronicLate']][['Employee', 'LateDays', 'PresentDays']].copy()
+    chronic_late_emps['Late %'] = (chronic_late_emps['LateDays'] / chronic_late_emps['PresentDays'] * 100).round(1)
+    
+    st.dataframe(
+        chronic_late_emps,
+        use_container_width=True,
+        height=400,
+        hide_index=True
+    )
+
+@st.dialog("🟠 Employees Under 8 Hours Average", width="large")
+def show_under_hours_modal(employee_stats):
+    under_hours_emps = employee_stats[employee_stats['UnderHours']][['Employee', 'AvgWorkHours', 'PresentDays']].copy()
+    under_hours_emps['AvgWorkHours'] = under_hours_emps['AvgWorkHours'].round(1)
+    under_hours_emps.columns = ['Employee', 'Avg Work Hours', 'Present Days']
+    
+    st.dataframe(
+        under_hours_emps,
+        use_container_width=True,
+        height=400,
+        hide_index=True
+    )
+
+@st.dialog("👤 Employee Attendance Details", width="large")
+def show_employee_details_modal(df_daily, employee_name):
+    st.subheader(f"{employee_name}")
+    
+    emp_records = df_daily[df_daily['Employee'] == employee_name].copy()
+    emp_records['Date'] = pd.to_datetime(emp_records['Date']).dt.strftime('%Y-%m-%d')
+    emp_records['Entry'] = emp_records['FirstIn'].dt.strftime('%H:%M:%S')
+    emp_records['Exit'] = emp_records['LastOut'].dt.strftime('%H:%M:%S')
+    emp_records['Working Hours'] = emp_records['WorkHours'].round(2)
+    
+    detail_table = emp_records[['Employee', 'Date', 'Entry', 'Exit', 'Working Hours', 'Note']]
+    
+    st.dataframe(
+        detail_table,
+        use_container_width=True,
+        height=500,
+        hide_index=True
+    )
 
 # FILE UPLOAD
 uploaded_file = st.file_uploader("📤 Upload Excel Attendance Sheet", type=['xlsx', 'xls', 'csv'])
@@ -275,74 +272,49 @@ if uploaded_file is not None:
             with col1:
                 avg_attendance = employee_stats['AttendancePct'].mean()
                 st.markdown(f"""
-                <div class='kpi-card kpi-green'>
-                    <div class='kpi-label'>Avg Attendance</div>
-                    <div class='kpi-number'>{int(avg_attendance)}%</div>
+                <div style='padding: 20px; border-radius: 10px; text-align: center; color: white; background: linear-gradient(135deg, #27ae60 0%, #229954 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-height: 120px;'>
+                    <div style='font-size: 13px; opacity: 0.95; text-transform: uppercase; letter-spacing: 0.5px;'>AVG ATTENDANCE</div>
+                    <div style='font-size: 42px; font-weight: bold; margin: 10px 0;'>{int(avg_attendance)}%</div>
                 </div>
                 """, unsafe_allow_html=True)
             
             with col2:
                 avg_work_hrs = employee_stats['AvgWorkHours'].mean()
                 st.markdown(f"""
-                <div class='kpi-card kpi-blue'>
-                    <div class='kpi-label'>Average Net Work Hrs</div>
-                    <div class='kpi-number'>{avg_work_hrs:.1f} hrs</div>
+                <div style='padding: 20px; border-radius: 10px; text-align: center; color: white; background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-height: 120px;'>
+                    <div style='font-size: 13px; opacity: 0.95; text-transform: uppercase; letter-spacing: 0.5px;'>AVERAGE NET WORK HRS</div>
+                    <div style='font-size: 42px; font-weight: bold; margin: 10px 0;'>{avg_work_hrs:.1f} hrs</div>
                 </div>
                 """, unsafe_allow_html=True)
             
             with col3:
                 chronic_late_pct = (employee_stats['ChronicLate'].sum() / len(employee_stats) * 100)
-                if st.button(f"🔴 Chronic Late: {int(chronic_late_pct)}%", key='chronic_late_btn', use_container_width=True):
-                    st.session_state.show_popup = True
-                    st.session_state.popup_type = 'chronic_late'
-                    st.rerun()
-                st.caption("👆 Click to see details", unsafe_allow_html=True)
+                
+                # Create clickable card-looking button
+                st.markdown(f"""
+                <div style='padding: 20px; border-radius: 10px; text-align: center; color: white; background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-height: 120px;'>
+                    <div style='font-size: 13px; opacity: 0.95; text-transform: uppercase; letter-spacing: 0.5px;'>CHRONIC LATE</div>
+                    <div style='font-size: 42px; font-weight: bold; margin: 10px 0;'>{int(chronic_late_pct)}%</div>
+                    <div style='font-size: 10px; opacity: 0.7; font-style: italic;'>👆 Click to see details</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button("View Chronic Late Details", key='chronic_late_btn', use_container_width=True, type="secondary"):
+                    show_chronic_late_modal(employee_stats)
             
             with col4:
                 under_hours_pct = (employee_stats['UnderHours'].sum() / len(employee_stats) * 100)
-                if st.button(f"🟠 Under 8hrs: {int(under_hours_pct)}%", key='under_hours_btn', use_container_width=True):
-                    st.session_state.show_popup = True
-                    st.session_state.popup_type = 'under_hours'
-                    st.rerun()
-                st.caption("👆 Click to see details", unsafe_allow_html=True)
-            
-            # POPUP DISPLAY
-            if st.session_state.show_popup:
-                if st.session_state.popup_type == 'chronic_late':
-                    st.markdown("### 🔴 Chronic Late Employees (Late ≥20% of days)")
-                    chronic_late_emps = employee_stats[employee_stats['ChronicLate']][['Employee', 'LateDays', 'PresentDays']]
-                    chronic_late_emps['Late %'] = (chronic_late_emps['LateDays'] / chronic_late_emps['PresentDays'] * 100).round(1)
-                    st.dataframe(chronic_late_emps, use_container_width=True)
-                    if st.button("✖ Close", key='close_chronic'):
-                        st.session_state.show_popup = False
-                        st.rerun()
                 
-                elif st.session_state.popup_type == 'under_hours':
-                    st.markdown("### 🟠 Employees Under 8 Hours Average")
-                    under_hours_emps = employee_stats[employee_stats['UnderHours']][['Employee', 'AvgWorkHours', 'PresentDays']]
-                    under_hours_emps['AvgWorkHours'] = under_hours_emps['AvgWorkHours'].round(1)
-                    st.dataframe(under_hours_emps, use_container_width=True)
-                    if st.button("✖ Close", key='close_under'):
-                        st.session_state.show_popup = False
-                        st.rerun()
+                st.markdown(f"""
+                <div style='padding: 20px; border-radius: 10px; text-align: center; color: white; background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-height: 120px;'>
+                    <div style='font-size: 13px; opacity: 0.95; text-transform: uppercase; letter-spacing: 0.5px;'>UNDER 8HRS</div>
+                    <div style='font-size: 42px; font-weight: bold; margin: 10px 0;'>{int(under_hours_pct)}%</div>
+                    <div style='font-size: 10px; opacity: 0.7; font-style: italic;'>👆 Click to see details</div>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                elif st.session_state.popup_type == 'employee_detail':
-                    emp_name = st.session_state.selected_employee
-                    st.markdown(f"### 👤 {emp_name} - Attendance Details")
-                    
-                    emp_records = df_daily[df_daily['Employee'] == emp_name].copy()
-                    emp_records['Date'] = pd.to_datetime(emp_records['Date']).dt.strftime('%Y-%m-%d')
-                    emp_records['Entry'] = emp_records['FirstIn'].dt.strftime('%H:%M:%S')
-                    emp_records['Exit'] = emp_records['LastOut'].dt.strftime('%H:%M:%S')
-                    emp_records['Working Hours'] = emp_records['WorkHours'].round(2)
-                    
-                    detail_table = emp_records[['Employee', 'Date', 'Entry', 'Exit', 'Working Hours', 'Note']]
-                    st.dataframe(detail_table, use_container_width=True, height=400)
-                    
-                    if st.button("✖ Close", key='close_emp'):
-                        st.session_state.show_popup = False
-                        st.session_state.selected_employee = None
-                        st.rerun()
+                if st.button("View Under Hours Details", key='under_hours_btn', use_container_width=True, type="secondary"):
+                    show_under_hours_modal(employee_stats)
             
             # MAIN LAYOUT
             col_left, col_right = st.columns([2.5, 1.5])
@@ -350,38 +322,34 @@ if uploaded_file is not None:
             with col_left:
                 # TOP 5 BEST COMPLIANT
                 st.markdown("<div class='section-header'>Top 5 Best Compliant Employees</div>", unsafe_allow_html=True)
+                st.caption("Click on employee name to see attendance details:")
                 
                 top_compliant = employee_stats.nlargest(5, 'AvgWorkHours')[['Employee', 'AvgWorkHours', 'AvgDeviation']].copy()
                 top_compliant['AvgWorkHours'] = top_compliant['AvgWorkHours'].round(1)
                 
-                st.write("Click on employee name to see attendance details:")
                 for idx, row in top_compliant.iterrows():
                     col_name, col_hours, col_dev = st.columns([2, 1, 1])
                     with col_name:
                         if st.button(f"👤 {row['Employee']}", key=f"best_{idx}", use_container_width=True):
-                            st.session_state.show_popup = True
-                            st.session_state.popup_type = 'employee_detail'
-                            st.session_state.selected_employee = row['Employee']
-                            st.rerun()
+                            show_employee_details_modal(df_daily, row['Employee'])
                     with col_hours:
                         st.metric("Avg Hours", f"{row['AvgWorkHours']:.1f}")
                     with col_dev:
                         st.metric("Deviation", f"{row['AvgDeviation']:.1f}")
                 
+                st.markdown("<br>", unsafe_allow_html=True)
+                
                 # TOP 5 RISK EMPLOYEES
                 st.markdown("<div class='section-header'>Top 5 Risk Employees</div>", unsafe_allow_html=True)
+                st.caption("Click on employee name to see attendance details:")
                 
                 top_risk = employee_stats.nlargest(5, 'TotalRiskDays')[['Employee', 'LateDays', 'EarlyExitDays', 'TotalRiskDays']].copy()
                 
-                st.write("Click on employee name to see attendance details:")
                 for idx, row in top_risk.iterrows():
                     col_name, col_late, col_early, col_total = st.columns([2, 1, 1, 1])
                     with col_name:
                         if st.button(f"⚠️ {row['Employee']}", key=f"risk_{idx}", use_container_width=True):
-                            st.session_state.show_popup = True
-                            st.session_state.popup_type = 'employee_detail'
-                            st.session_state.selected_employee = row['Employee']
-                            st.rerun()
+                            show_employee_details_modal(df_daily, row['Employee'])
                     with col_late:
                         st.metric("Late", int(row['LateDays']))
                     with col_early:
