@@ -13,8 +13,8 @@ st.write("Choose a report type to get started:")
 
 st.divider()
 
-# Create three columns for the report options
-col1, col2, col3, col4 = st.columns(4)
+# Create five columns for the report options
+col1, col2, col3, col4, col5 = st.columns(5)
 
 with col1:
     st.header("📊 Visa Report")
@@ -69,6 +69,20 @@ with col4:
     """)
     if st.button("🎓 Open COE Report", use_container_width=True, type="primary"):
         st.switch_page("pages/4_🎓_COE_Report.py")
+
+with col5:
+    st.header("📅 Attendance Report")
+    st.write("Employee Attendance & Compliance Dashboard")
+    st.write("**Features:**")
+    st.markdown("""
+    - Upload Excel attendance sheets
+    - Auto-compute work hours & breaks
+    - Late arrival tracking
+    - Compliance flags (red/orange/green)
+    - Management overview dashboard
+    """)
+    if st.button("📅 Open Attendance Report", use_container_width=True, type="primary"):
+        st.switch_page("pages/5_📅_Attendance_Report.py")
 
 st.divider()
 
