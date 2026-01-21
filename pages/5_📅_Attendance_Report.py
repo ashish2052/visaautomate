@@ -770,7 +770,7 @@ if uploaded_file is not None:
                     
                     with col_conf:
                         st.markdown("### 2. Configure Content")
-                        st.info("💡 Use `{name}` for employee name and `{table}` for the violation data table.")
+                        st.info("💡 **Template System**: Use `{name}` and `{table}` placeholders. They will be automatically replaced with the actual employee name and their specific attendance violation table when generating the emails.")
                         
                         default_subject = "Notice of Attendance Irregularity - {name}"
                         default_body = """Dear {name},
@@ -788,8 +788,8 @@ If you have valid reasons for these instances, please report to HR.
 Regards,
 Management"""
                         
-                        email_subject_tmpl = st.text_input("Email Subject", value=default_subject)
-                        email_body_tmpl = st.text_area("Email Body (HTML Supported)", value=default_body, height=300)
+                        email_subject_tmpl = st.text_input("Email Subject Template", value=default_subject)
+                        email_body_tmpl = st.text_area("Email Body Template (HTML Supported)", value=default_body, height=300)
                     
                     with col_map:
                         st.markdown("### 3. Recipient Emails")
@@ -875,7 +875,7 @@ Management"""
                         return subj, body
 
                     # PREVIEW BUTTON
-                    if col_act1.button("👁️ Preview First Email"):
+                    if col_act1.button(f"👁️ Preview Email for {selected_emps[0]}"):
                         first_emp = selected_emps[0]
                         subj, body = generate_content_for_emp(first_emp)
                         st.toast(f"Generating preview for {first_emp}...", icon="👁️")
@@ -884,7 +884,7 @@ Management"""
                         st.components.v1.html(body, height=400, scrolling=True)
 
                     # SEND BUTTON
-                    if col_act2.button("🚀 Send to All Recipients"):
+                    if col_act2.button(f"🚀 Send to {len(edited_df)} Recipients"):
                         if not sender_email or not sender_password:
                             st.error("Missing Sender Credentials.")
                         else:
