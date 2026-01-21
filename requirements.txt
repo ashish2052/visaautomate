@@ -4,3 +4,5 @@ xlsxwriter
 matplotlib
 requests
 openpyxl
+plotly
+numpy
