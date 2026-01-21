@@ -290,30 +290,77 @@ if uploaded_file is not None:
             with col3:
                 chronic_late_pct = (employee_stats['ChronicLate'].sum() / len(employee_stats) * 100)
                 
-                # Create clickable card-looking button
-                st.markdown(f"""
-                <div style='padding: 20px; border-radius: 10px; text-align: center; color: white; background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-height: 120px;'>
-                    <div style='font-size: 13px; opacity: 0.95; text-transform: uppercase; letter-spacing: 0.5px;'>CHRONIC LATE</div>
-                    <div style='font-size: 42px; font-weight: bold; margin: 10px 0;'>{int(chronic_late_pct)}%</div>
-                    <div style='font-size: 10px; opacity: 0.7; font-style: italic;'>👆 Click to see details</div>
-                </div>
+                # Make the card itself clickable
+                chronic_clicked = st.button(
+                    f"🔴 CHRONIC LATE\n\n{int(chronic_late_pct)}%\n\n👆 Click to see details",
+                    key='chronic_late_btn',
+                    use_container_width=True,
+                    type="secondary"
+                )
+                
+                # Style the button to look like a card
+                st.markdown("""
+                <style>
+                button[kind="secondary"][data-testid="baseButton-secondary"]:has(+ div):nth-of-type(1) {
+                    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%) !important;
+                    color: white !important;
+                    border: none !important;
+                    padding: 20px !important;
+                    border-radius: 10px !important;
+                    min-height: 120px !important;
+                    font-size: 42px !important;
+                    font-weight: bold !important;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
+                    transition: transform 0.2s !important;
+                    white-space: pre-line !important;
+                    text-align: center !important;
+                }
+                button[kind="secondary"][data-testid="baseButton-secondary"]:has(+ div):nth-of-type(1):hover {
+                    transform: scale(1.05) !important;
+                    box-shadow: 0 6px 12px rgba(0,0,0,0.4) !important;
+                }
+                </style>
                 """, unsafe_allow_html=True)
                 
-                if st.button("View Chronic Late Details", key='chronic_late_btn', use_container_width=True, type="secondary"):
+                if chronic_clicked:
                     show_chronic_late_modal(employee_stats)
             
             with col4:
                 under_hours_pct = (employee_stats['UnderHours'].sum() / len(employee_stats) * 100)
                 
-                st.markdown(f"""
-                <div style='padding: 20px; border-radius: 10px; text-align: center; color: white; background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-height: 120px;'>
-                    <div style='font-size: 13px; opacity: 0.95; text-transform: uppercase; letter-spacing: 0.5px;'>UNDER 8HRS</div>
-                    <div style='font-size: 42px; font-weight: bold; margin: 10px 0;'>{int(under_hours_pct)}%</div>
-                    <div style='font-size: 10px; opacity: 0.7; font-style: italic;'>👆 Click to see details</div>
-                </div>
+                # Make the card itself clickable
+                under_clicked = st.button(
+                    f"🟠 UNDER 8HRS\n\n{int(under_hours_pct)}%\n\n👆 Click to see details",
+                    key='under_hours_btn',
+                    use_container_width=True,
+                    type="secondary"
+                )
+                
+                # Style the button to look like a card
+                st.markdown("""
+                <style>
+                button[kind="secondary"][data-testid="baseButton-secondary"]:has(+ div):nth-of-type(2) {
+                    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%) !important;
+                    color: white !important;
+                    border: none !important;
+                    padding: 20px !important;
+                    border-radius: 10px !important;
+                    min-height: 120px !important;
+                    font-size: 42px !important;
+                    font-weight: bold !important;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
+                    transition: transform 0.2s !important;
+                    white-space: pre-line !important;
+                    text-align: center !important;
+                }
+                button[kind="secondary"][data-testid="baseButton-secondary"]:has(+ div):nth-of-type(2):hover {
+                    transform: scale(1.05) !important;
+                    box-shadow: 0 6px 12px rgba(0,0,0,0.4) !important;
+                }
+                </style>
                 """, unsafe_allow_html=True)
                 
-                if st.button("View Under Hours Details", key='under_hours_btn', use_container_width=True, type="secondary"):
+                if under_clicked:
                     show_under_hours_modal(employee_stats)
             
             # MAIN LAYOUT
