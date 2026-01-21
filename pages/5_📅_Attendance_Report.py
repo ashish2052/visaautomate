@@ -748,38 +748,36 @@ if uploaded_file is not None:
                     (employee_stats['TotalRiskDays'] > 0)
                 ].sort_values('TotalRiskDays', ascending=False)
                 
-                # Multiselect for employees
-                all_emps = employee_stats['Employee'].tolist()
+                risk_employees = risk_candidates['Employee'].tolist()
+                formatted_names = risk_employees # Use risk_employees for default selection
                 
-                # Pre-select risk candidates if any, otherwise empty
-                # default_selection = [] # Start empty to force user choice or maybe pre-fill risk ones? User said "Select employees below". Let's stick to manual.
-                
-                # Callback to clear old drafts if selection changes
-                def clear_drafts():
-                    if "generated_drafts" in st.session_state:
-                        st.session_state.generated_drafts = None
-                        
+                # Explicitly track selection changes to clear drafts reliably
+                if "last_selected_emps" not in st.session_state:
+                    st.session_state.last_selected_emps = []
+
                 selected_emps = st.multiselect(
                     "Select Employees to Email:",
-                    options=all_emps, # Using all_emps as risk_employees and formatted_names are not defined
-                    default=[], # Keeping default empty as formatted_names is not defined
-                    on_change=clear_drafts,
-                    key="emp_multiselect",
-                    help="Select employees who need to receive warning emails."
+                    options=risk_employees, # Use risk list for options
+                    default=formatted_names if 'formatted_names' in locals() else [],
+                    key="emp_multiselect"
                 )
                 
-                if selected_emps:
-                    st.markdown("---")
-                    col_conf, col_map = st.columns([1.5, 1])
-                    
-                    with col_conf:
-                        st.markdown("### 2. Configure Content")
-                        st.info("💡 **Template System**: Use `{name}` and `{table}` placeholders. They will be automatically replaced with the actual employee name and their specific attendance violation table when generating the emails.")
-                        
-                        default_subject = "Notice of Attendance Irregularity - {name}"
-                        default_body = """Dear {name},
+                # Check for change and reset drafts
+                if selected_emps != st.session_state.last_selected_emps:
+                    st.session_state.last_selected_emps = selected_emps
+                    st.session_state.generated_drafts = None
+                    # We don't rerun here to avoid flicker, the UI will update on next interaction or we just hide the drafts block below
+                
+                st.markdown("---")
+                st.markdown("### 2. Configure Content")
+                
+                st.info("💡 **Template System**: Use `{name}` and `{table}` placeholders. They will be automatically replaced with the actual employee name and their specific attendance violation table when generating the emails.")
 
-We have noticed some irregularities in your attendance for this month. 
+                email_subject_tmpl = st.text_input("Email Subject Template", value="Notice of Attendance Irregularity - {name}")
+                email_body_tmpl = st.text_area("Email Body Template (HTML Supported)", 
+                    value="""Dear {name},
+
+We have noticed some irregularities in your attendance for this month.
 Our office hours are from <b>9:30 AM to 5:30 PM</b>.
 
 Below is a summary of dates where you were flagged for Late Entry, Early Exit without sufficient hours, or under-time:
@@ -790,129 +788,138 @@ Please ensure you adhere to the office schedule moving forward.
 If you have valid reasons for these instances, please report to HR.
 
 Regards,
-Management"""
-                        
-                        email_subject_tmpl = st.text_input("Email Subject Template", value=default_subject)
-                        email_body_tmpl = st.text_area("Email Body Template (HTML Supported)", value=default_body, height=300)
-                    
-                    with col_map:
-                        st.markdown("### 3. Recipient Emails")
-                        st.caption("Enter the destination email for each selected employee.")
-                        
-                        # Prepare data for editor
-                        # We use session state to persist email entries if selection changes slightly, 
-                        # but for simplicity, we regenerate. Ideally, we persist.
-                        
-                        # Create a base dataframe
-                        map_data = []
-                        for emp in selected_emps:
-                            # Try to find if we already have an email (dummy mock check) or empty
-                            map_data.append({"Employee": emp, "Email Address": ""})
-                        
-                        df_map = pd.DataFrame(map_data)
-                        
-                        edited_df = st.data_editor(
-                            df_map, 
-                            hide_index=True, 
-                            use_container_width=True,
-                            column_config={
-                                "Employee": st.column_config.TextColumn(disabled=True),
-                                "Email Address": st.column_config.TextColumn(required=True, validate="^\\S+@\\S+\\.\\S+$")
-                            },
-                            key="email_map_editor"
-                        )
-                    
-                    st.markdown("---")
-                    st.markdown("### 4. Review & Send")
-                    
-                    # Credentials Input
-                    config = load_config()
-                    col_creds1, col_creds2 = st.columns(2)
-                    sender_email = col_creds1.text_input("Sender Email", value=config.get("sender_email", ""))
-                    sender_password = col_creds2.text_input("Sender App Password", value=config.get("sender_password", ""), type="password")
-                    
-                    # Store generated drafts in session state to persist between reruns
-                    if "generated_drafts" not in st.session_state:
-                        st.session_state.generated_drafts = None
-                    
-                    # Helper to generate content
-                    def generate_content_for_emp(emp_name):
-                        # Get irregularities
-                        emp_data = df_daily[
-                            (df_daily['Employee'] == emp_name) & 
-                            (
-                                (df_daily['IsLate']) | 
-                                (df_daily['IsEarlyExit']) | 
-                                (df_daily['WorkHours'] < REQUIRED_HOURS)
-                            )
-                        ]
-                        
-                        # Generate HTML Table
-                        if emp_data.empty:
-                            table_html = "<div style='color:#666; font-style:italic;'>No specific irregularities found in data.</div>"
-                        else:
-                            table_html = """<table style="border-collapse: collapse; width: 100%; border: 1px solid #ddd; font-family: sans-serif; font-size: 13px; color: #333;">
-                                <tr style="background-color: #f2f2f2; color: #333;">
-                                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Date</th>
-                                    <th style="border: 1px solid #ddd; padding: 8px;">In</th>
-                                    <th style="border: 1px solid #ddd; padding: 8px;">Out</th>
-                                    <th style="border: 1px solid #ddd; padding: 8px;">Hrs</th>
-                                    <th style="border: 1px solid #ddd; padding: 8px;">Issue</th>
-                                </tr>"""
-                            for _, row in emp_data.iterrows():
-                                color = "color: #d35400;" if row['IsLate'] else ("color: #c0392b;" if row['IsEarlyExit'] else "")
-                                table_html += f"""<tr style="background-color: #fff;">
-                                    <td style="border: 1px solid #ddd; padding: 8px;">{row['Date']}</td>
-                                    <td style="border: 1px solid #ddd; padding: 8px; {color if row['IsLate'] else ''}">{row['FirstIn']}</td>
-                                    <td style="border: 1px solid #ddd; padding: 8px; {color if row['IsEarlyExit'] else ''}">{row['LastOut']}</td>
-                                    <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">{row['WorkHours']}</td>
-                                    <td style="border: 1px solid #ddd; padding: 8px;">{row['Note']}</td>
-                                </tr>"""
-                            table_html += "</table>"
-                        
-                        # Fill Templates
-                        subj = email_subject_tmpl.replace("{name}", emp_name)
-                        raw_body = email_body_tmpl.replace("{name}", emp_name).replace("{table}", table_html)
-                        
-                        # Convert newlines to breaks if it looks like plain text
-                        if "<p>" not in raw_body and "<br>" not in raw_body:
-                            raw_body = raw_body.replace("\n", "<br>")
-                        
-                        # Wrap in a clean container for consistent rendering (Fixes dark mode invisibility)
-                        final_body = f"""
-                        <div style="font-family: Arial, sans-serif; color: #333333; background-color: #ffffff; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
-                            {raw_body}
-                        </div>
-                        """
-                            
-                        return subj, final_body
+Management""", height=300)
 
-                    # GENERATE DRAFTS BUTTON
-                    if st.button("📝 Generate Drafts for Review list"):
-                        drafts = []
+                st.markdown("---")
+                st.markdown("### 3. Recipient Emails")
+                st.caption("Enter the destination email for each selected employee.")
+
+                # Create map for selected only
+                if not selected_emps:
+                     st.warning("Please select employees above.")
+                     edited_df = pd.DataFrame()
+                else:
+                    df_map = pd.DataFrame({
+                        "Employee": selected_emps,
+                        "Email Address": [""] * len(selected_emps) # Default empty
+                    })
+                    
+                    edited_df = st.data_editor(
+                        df_map,
+                        column_config={
+                            "Employee": st.column_config.TextColumn("Employee", disabled=True),
+                            "Email Address": st.column_config.TextColumn("Email Address", required=True, validate="^\\S+@\\S+\\.\\S+$")
+                        },
+                        hide_index=True,
+                        use_container_width=True,
+                        num_rows="fixed",
+                        key="email_map_editor" # Key helps persist data
+                    )
+                    
+                st.markdown("---")
+                st.markdown("### 4. Review & Send")
+                
+                # Credentials Input
+                config = load_config()
+                col_creds1, col_creds2 = st.columns(2)
+                sender_email = col_creds1.text_input("Sender Email", value=config.get("sender_email", ""))
+                sender_password = col_creds2.text_input("Sender App Password", value=config.get("sender_password", ""), type="password")
+                
+                # Store generated drafts in session state
+                if "generated_drafts" not in st.session_state:
+                    st.session_state.generated_drafts = None
+                
+                # Helper to generate content
+                def generate_content_for_emp(emp_name):
+                    # Get irregularities
+                    emp_data = df_daily[
+                        (df_daily['Employee'] == emp_name) & 
+                        (
+                            (df_daily['IsLate']) | 
+                            (df_daily['IsEarlyExit']) | 
+                            (df_daily['WorkHours'] < REQUIRED_HOURS)
+                        )
+                    ]
+                    
+                    # Generate HTML Table
+                    if emp_data.empty:
+                        table_html = "<div style='color:#666; font-style:italic; padding:10px;'>No specific irregularities found in data.</div>"
+                    else:
+                        table_html = """<table style="border-collapse: collapse; width: 100%; border: 1px solid #ddd; font-family: sans-serif; font-size: 13px; color: #333; margin-top: 10px; margin-bottom: 10px;">
+                            <tr style="background-color: #f2f2f2; color: #333;">
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Date</th>
+                                <th style="border: 1px solid #ddd; padding: 8px;">In</th>
+                                <th style="border: 1px solid #ddd; padding: 8px;">Out</th>
+                                <th style="border: 1px solid #ddd; padding: 8px;">Hrs</th>
+                                <th style="border: 1px solid #ddd; padding: 8px;">Issue</th>
+                            </tr>"""
+                        for _, row in emp_data.iterrows():
+                            # color logic
+                            color = "color: #d35400;" if row['IsLate'] else ("color: #c0392b;" if row['IsEarlyExit'] else "")
+                            # row bg
+                            table_html += f"""<tr style="background-color: #fff;">
+                                <td style="border: 1px solid #ddd; padding: 8px;">{row['Date']}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; {color if row['IsLate'] else ''}">{row['FirstIn']}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; {color if row['IsEarlyExit'] else ''}">{row['LastOut']}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">{row['WorkHours']}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">{row['Note']}</td>
+                            </tr>"""
+                        table_html += "</table>"
+                    
+                    # Fill Templates
+                    subj = email_subject_tmpl.replace("{name}", emp_name)
+                    raw_body = email_body_tmpl.replace("{name}", emp_name).replace("{table}", table_html)
+                    
+                    # Convert newlines to breaks if it looks like plain text
+                    if "<p>" not in raw_body and "<br>" not in raw_body:
+                        raw_body = raw_body.replace("\n", "<br>")
+                    
+                    # Wrap in a clean container for consistent rendering (Fixes dark mode invisibility & layout)
+                    final_body = f"""
+                    <div style="font-family: Arial, sans-serif; color: #000000; background-color: #ffffff; padding: 20px; border: 1px solid #ccc; border-radius: 4px;">
+                        {raw_body}
+                    </div>
+                    """
+                        
+                    return subj, final_body
+
+                # GENERATE DRAFTS BUTTON
+                if st.button("📝 Generate Drafts for Review list"):
+                    drafts = []
+                    # Use edited_df to get the current list of employees and emails
+                    if not edited_df.empty:
                         for i, row in edited_df.iterrows():
                             emp = row['Employee']
                             subj, body = generate_content_for_emp(emp)
                             drafts.append({"Employee": emp, "Subject": subj, "Body": body, "Email": row['Email Address']})
                         st.session_state.generated_drafts = drafts
                         st.rerun()
+                    else:
+                        st.warning("No employees selected.")
 
-                    # DISPLAY DRAFTS IF GENERATED
-                    if st.session_state.get("generated_drafts"):
-                        st.divider()
-                        st.caption("✅ Drafts generated. Please review contents below before sending.")
+                # DISPLAY DRAFTS IF GENERATED
+                if st.session_state.get("generated_drafts"):
+                    # Double check if drafts match current selection length? 
+                    # Actually, we rely on the user clicking Generate again.
+                    # But we clear it on selection change, so it should be fine.
+                    
+                    st.divider()
+                    st.success(f"✅ Generated {len(st.session_state.generated_drafts)} Draft(s). Please review below.")
+                    
+                    drafts = st.session_state.generated_drafts
+                    
+                    for d in drafts:
+                        target_email = d['Email'] if d['Email'] else "(No Email Entered!)"
+                        with st.expander(f"Draft for {d['Employee']} (To: {target_email})"):
+                            st.markdown(f"**Subject:** {d['Subject']}")
+                            st.markdown("**Body Preview:**")
+                            # Use st.markdown with unsafe_allow_html for better rendering (no iframe gap)
+                            st.markdown(d['Body'], unsafe_allow_html=True)
                         
-                        drafts = st.session_state.generated_drafts
+                    st.divider()
                         
-                        for d in drafts:
-                            with st.expander(f"Draft for {d['Employee']} (To: {d['Email']})"):
-                                st.markdown(f"**Subject:** {d['Subject']}")
-                                st.components.v1.html(d['Body'], height=400, scrolling=True)
-                        
-                        st.divider()
-                        
-                        # SEND BUTTON
-                        if st.button(f"🚀 Confirm & Send {len(drafts)} Emails"):
+                    # SEND BUTTON
+                    if st.button(f"🚀 Confirm & Send {len(drafts)} Emails"):
                             if not sender_email or not sender_password:
                                 st.error("Missing Sender Credentials.")
                             else:
